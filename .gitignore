@@ -1,0 +1,26 @@
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Frontend dependencies and build output
+node_modules/
+dist/
+
+# Local database and uploaded data
+data/chroma/
+uploads/
+*.log
+
+# Editors and operating system
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

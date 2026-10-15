@@ -1,0 +1,39 @@
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+:root {
+  font-family: Inter, "Microsoft YaHei", "Segoe UI", sans-serif;
+  color: #20243a;
+  background: #f7f8fc;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* { box-sizing: border-box; }
+
+html {
+  min-width: 360px;
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  min-width: 360px;
+  min-height: 100vh;
+}
+
+button, textarea, input, select {
+  font: inherit;
+}
+
+button:focus-visible, textarea:focus-visible, select:focus-visible {
+  outline: 2px solid #8e80ef;
+  outline-offset: 2px;
+}
+
+::selection {
+  color: #37305d;
+  background: #e1dcff;
+}
