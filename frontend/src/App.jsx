@@ -908,12 +908,45 @@ onClick={() => {
                 <label className="field-label" htmlFor="model-select">当前对话模型</label>
                 <select id="model-select" value={model} onChange={e => setModel(e.target.value)} className="model-select">
                   <option value="deepseek">DeepSeek · 在线模型</option>
-                  <option value="local">Qwen 2.5 · 本地模型</option>
+                  <option value="local">
+                    Qwen 2.5 · 本地模型{health?.local_chat_available === false ? '（未就绪）' : ''}
+                  </option>
                 </select>
                 <div className="model-note">
                   <span className={`status-dot ${model === 'deepseek' ? 'blue-dot' : 'green-dot'}`} />
                   {model === 'deepseek' ? '通过 API 调用 DeepSeek' : '通过本机 Ollama 调用 Qwen'}
                 </div>
+
+                {health && (
+                  <div style={{
+                    marginTop: '8px',
+                    padding: '8px 10px',
+                    borderRadius: '8px',
+                    background: health.fallback_mode ? '#fffaf0' : '#f3fbf6',
+                    color: health.fallback_mode ? '#8a6100' : '#177a45',
+                    fontSize: '11.5px',
+                    lineHeight: 1.75,
+                  }}>
+                    <div>
+                      嵌入后端：
+                      {health.embedding?.backend === 'ollama'
+                        ? 'Ollama · nomic-embed-text'
+                        : '离线哈希嵌入（已降级，无需 Ollama）'}
+                    </div>
+                    <div>
+                      本地模型：
+                      {health.local_chat_available
+                        ? `${health.local_chat_model} 可用`
+                        : '不可用 · 提问与翻译将自动使用在线模型'}
+                    </div>
+                    {health.fallback_mode && !health.deepseek_configured && (
+                      <div style={{ color: '#a12b2b' }}>
+                        在线模型未配置（DEEPSEEK_API_KEY 为空），请补充配置。
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="divider" />
                 <div className="capability-row"><span>论文检索</span><span className="capability-enabled">已接入</span></div>
                 <div className="capability-row"><span>持久化知识库</span><span className="capability-enabled">已接入</span></div>
