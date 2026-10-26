@@ -76,6 +76,7 @@ ResearchPilot/
 │   ├── pdf_structure.py     # 版式感知解析 + OCR + 图表裁切（StructureParser）
 │   ├── semantic_dedup.py    # 句子级语义对齐与版本保留建议
 │   ├── qa.py                # 检索单元构建、BM25/RRF、断言核验
+│   ├── embedding.py         # 嵌入后端探测：Ollama 优先，离线哈希降级
 │   ├── translation.py       # 分章节翻译与磁盘缓存
 │   ├── writing.py           # 无幻觉框架、拓扑图脚本、学术翻译
 │   ├── dataviz.py           # CSV 画像、SVG 图表、学术图注
@@ -99,14 +100,25 @@ ResearchPilot/
 
 ### 4.1 前置条件
 
-| 依赖 | 版本要求 | 说明 |
-|---|---|---|
-| Python | 3.10+（开发环境 3.12） | 后端与解析管线 |
-| Node.js | 18+ | 前端构建 |
-| Ollama | 最新 | 本地嵌入与对话模型 |
+| 依赖 | 版本要求 | 是否必需 | 说明 |
+|---|---|---|---|
+| Python | 3.10+（开发环境 3.12） | 必需 | 后端与解析管线 |
+| Node.js | 18+ | 必需 | 前端构建 |
+| DeepSeek API Key | — | 二选一 | 在线模型，无需本地算力 |
+| Ollama | 最新 | 二选一 | 本地嵌入与对话模型 |
+
+**两种运行模式，任选其一即可跑通全流程：**
+
+| 模式 | 需要什么 | 嵌入来源 | 对话模型 |
+|---|---|---|---|
+| 在线模式（推荐） | `DEEPSEEK_API_KEY` | 离线哈希嵌入（内置，无需 Ollama） | DeepSeek |
+| 本地模式 | Ollama + 两个模型 | Ollama `nomic-embed-text` | `qwen2.5:7b` |
+
+也就是说：**没装 Ollama、Ollama 没启动、或本地模型没下载，Agent 依然可用**——后端会自动把嵌入降级为内置的离线哈希嵌入、把对话回落到在线模型，并在界面上标注当前使用的后端。
+
+想用本地模型时：
 
 ```bash
-# 拉取所需模型
 ollama pull nomic-embed-text
 ollama pull qwen2.5:7b
 ```
@@ -126,8 +138,8 @@ pip install -r requirements.txt
 
 # 3) 配置环境变量
 cp .env.example .env            # Windows: copy .env.example .env
-#   编辑 .env：至少确认 OLLAMA_BASE_URL 与 CHROMA_PATH；
-#   如需在线模型，填入 DEEPSEEK_API_KEY
+#   最简配置：只填 DEEPSEEK_API_KEY（无需 Ollama）
+#   本地模式：确认 OLLAMA_BASE_URL 并拉取嵌入/对话模型
 
 # 4) 启动
 uvicorn main:app --reload --port 8000
@@ -159,13 +171,15 @@ npm run dev                     # 默认 http://127.0.0.1:5173
 
 | 变量 | 必填 | 默认值 | 说明 |
 |---|---|---|---|
-| `OLLAMA_BASE_URL` | 否 | `http://127.0.0.1:11434` | 本地模型服务地址 |
-| `LOCAL_CHAT_MODEL` | 否 | `qwen2.5:7b` | 本地对话模型 |
-| `EMBED_MODEL` | 否 | `nomic-embed-text:latest` | 向量化模型 |
-| `DEEPSEEK_API_KEY` | 否 | 空 | 留空则全部退回本地模型 |
+| `DEEPSEEK_API_KEY` | 二选一 | 空 | 填了就走在线模式（无需 Ollama）；留空则必须让 Ollama 可用 |
 | `DEEPSEEK_MODEL` | 否 | `deepseek-flash` | 在线模型名 |
 | `DEEPSEEK_BASE_URL` | 否 | `https://api.deepseek.com` | 在线模型网关 |
+| `OLLAMA_BASE_URL` | 否 | `http://127.0.0.1:11434` | 本地模型服务地址；连不上会自动降级 |
+| `LOCAL_CHAT_MODEL` | 否 | `qwen2.5:7b` | 本地对话模型（未下载时自动改用在线模型） |
+| `EMBED_MODEL` | 否 | `nomic-embed-text:latest` | 本地嵌入模型（不可用时自动改用离线哈希嵌入） |
 | `CHROMA_PATH` | 否 | `D:/ResearchPilot/data/chroma` | 向量库路径；同级自动创建 `parsed/` `figures/` `translated/` `charts/` |
+
+两种嵌入后端的数据互不混写：Ollama 模式用 `research_papers` / `paper_units`，降级模式用 `research_papers_hash` / `paper_units_hash`，因此切换后端不会损坏已有索引。当前状态可通过 `GET /health` 的 `embedding`、`local_chat_available`、`fallback_mode` 字段查看（前端模型卡片也会实时显示）。
 
 完整模板见 [`backend/.env.example`](backend/.env.example)。`backend/.env` 已被 `.gitignore` 忽略，**请勿提交真实密钥**。
 
@@ -194,6 +208,8 @@ npm run dev                     # 默认 http://127.0.0.1:5173
 4. **翻译耗时受模型输出吞吐限制**：一篇 15 页论文全量翻译约数分钟，因此默认按章节渐进翻译；参考文献不翻译。
 5. 单文档解析上限 600 页；图表为 SVG（三维雷达为分层透视效果，非真三维坐标系）。
 6. 拓扑图脚本只做静态语法校验，本机不执行 LaTeX / Graphviz / Matplotlib 渲染。
+7. **降级模式的检索质量**：离线哈希嵌入是词袋级别的替代方案，比 `nomic-embed-text` 弱（同义改写、跨语言提问的召回会变差），但索引、检索、去重、核验流程完全可用。启动 Ollama 后重新索引即可切回语义嵌入（旧数据保留在 `*_hash` 集合中，互不影响）。
+8. 降级模式下 `research_papers` 与 `research_papers_hash` 是两套索引：切换到 Ollama 后需要**重新索引**才能在语义空间下检索。
 
 ---
 
