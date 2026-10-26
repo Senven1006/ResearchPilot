@@ -198,7 +198,7 @@ npm run dev                     # 默认 http://127.0.0.1:5173
 ---
 
 
-## 9. 许可与致谢
+## 8. 许可与致谢
 
 - 本项目依赖的开源组件许可证见各组件仓库：PyMuPDF、ChromaDB、FastAPI、RapidOCR-onnxruntime、React、Vite、lucide-react。
 - 使用 DeepSeek / Ollama 模型时请遵守对应服务条款；论文版权归原作者所有，本项目仅做本地解析与检索。
