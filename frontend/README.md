@@ -1,16 +1,27 @@
-# React + Vite
+# ResearchPilot 前端
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React 19 + Vite 8 单页应用，提供三块界面：
 
-Currently, two official plugins are available:
+| 界面 | 文件 | 说明 |
+|---|---|---|
+| 科研问答 | `src/App.jsx` | 上传 / 批量上传、单篇与多篇对比问答、证据锚点卡片、抗幻觉核验面板 |
+| 结构化阅读 | `src/StructurePanel.jsx` | 标题树导航、表格 / 图表 / 公式 / 参考文献、正文 `[n]` ↔ 文献双向跳转、中英双栏联动滚动与按章节渐进翻译 |
+| 写作 Copilot | `src/WritingPanel.jsx` | 论文框架生成、CSV 数据可视化、学术英文翻译 |
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 开发
 
-## React Compiler
+```bash
+npm install
+npm run dev        # http://127.0.0.1:5173
+```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+开发服务器把 `/api` 代理到 `http://127.0.0.1:8000`（见 `vite.config.js`），所以需要先启动后端。
 
-## Expanding the ESLint configuration
+## 构建与检查
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```bash
+npm run build      # 产物输出到 dist/
+npm run lint       # ESLint（当前 0 error / 0 warning）
+```
+
+项目说明、环境变量与完整安装步骤见仓库根目录的 [`../README.md`](../README.md)。
