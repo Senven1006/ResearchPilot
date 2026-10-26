@@ -6,6 +6,9 @@
 
 ---
 
+> 交付文档：技术文档见 [`docs/ResearchPilot-技术文档.pdf`](docs/ResearchPilot-技术文档.pdf)（20 页），
+> 源文件为 [`docs/technical-doc.md`](docs/technical-doc.md)，由 [`docs/md_to_pdf.py`](docs/md_to_pdf.py) 渲染。
+
 ## 1. 功能一览
 
 | 模块 | 能力 |
@@ -90,6 +93,7 @@ ResearchPilot/
 │   ├── vite.config.js       # /api → 127.0.0.1:8000 代理
 │   └── package.json
 ├── data/                    # 运行期生成（已 gitignore）
+├── docs/                    # 技术文档（Markdown 源 + 渲染脚本 + PDF）
 ├── .gitignore
 └── README.md
 ```
