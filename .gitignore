@@ -16,6 +16,10 @@ dist/
 
 # Local database and uploaded data
 data/chroma/
+data/parsed/
+data/figures/
+data/translated/
+data/charts/
 uploads/
 *.log
 
