@@ -3,14 +3,130 @@ import { useEffect, useRef, useState } from 'react'
 import {
   Activity, BookOpen, Bot, FileText, FolderOpen,
   GraduationCap, MessageSquare, Plus, Send, Settings2,
-  Sparkles, Upload, Trash2, PanelLeftClose,
+  ShieldCheck, Sparkles, Upload, PanelLeftClose,
 } from 'lucide-react'
 import './App.css'
+import StructurePanel from './StructurePanel'
+import WritingPanel from './WritingPanel'
 
 const API = '/api'
+const MAX_BATCH_FILES = 20
+
+function isPdfFile(file) {
+  return file.name.toLowerCase().endsWith('.pdf')
+}
+
+function formatSemanticWarning(file, data) {
+  const best = data.best
+  const percent = Math.round((best.content_similarity ?? 0) * 1000) / 10
+  const pages = (best.changed_pages || []).slice(0, 6).join('、')
+  const lines = [
+    `【${file.name}】与已入库 ${best.filename}（v${best.version || '未知'}）正文语义相似度 ${percent}%`,
+    `  新增 ${best.added_count} 句 / 删除 ${best.removed_count} 句` +
+      (pages ? `，变化涉及第 ${pages} 页` : ''),
+    `  判定：${best.verdict_label || '需人工确认'}`,
+    `  建议：${data.recommendation || '请人工确认要保留的版本'}`,
+  ]
+
+  const example = best.added_examples?.[0]?.text
+  if (example) {
+    lines.push(`  新增示例：${example.slice(0, 70)}…`)
+  }
+
+  return lines.join('\n') + '\n'
+}
+
+const VERDICT_STYLES = {
+  supported: { label: '已核验', background: '#e8f8ef', color: '#177a45' },
+  weak: { label: '弱支持', background: '#fff5e5', color: '#9a6100' },
+  unsupported: { label: '未支持', background: '#fff0f0', color: '#a12b2b' },
+  no_citation: { label: '无引用', background: '#f3f4f6', color: '#4b5563' },
+}
+
+function VerificationBlock({ verification, abstained, coverage, generationError }) {
+  const claims = verification?.claims || []
+  const grounding = verification?.grounding || {}
+  const score = Math.round((grounding.score || 0) * 100)
+  const coverageEntries = Object.entries(coverage || {})
+
+  if (!claims.length && !abstained && !generationError) return null
+
+  return (
+    <div className="sources" style={{ marginTop: '10px' }}>
+      <div className="sources-heading">
+        <ShieldCheck size={16} />
+        <strong>抗幻觉核验</strong>
+        {grounding.total > 0 && (
+          <span className="sources-count">
+            支持度 {score}% · 共 {grounding.total} 条断言
+          </span>
+        )}
+      </div>
+
+      {(abstained || generationError) && (
+        <div style={{
+          margin: '8px 0',
+          padding: '8px 10px',
+          borderRadius: '8px',
+          background: '#fff5e5',
+          color: '#9a6100',
+          fontSize: '12.5px',
+          lineHeight: 1.6,
+        }}>
+          {generationError
+            ? `模型调用失败：${generationError}（证据仍保留，可展开原文核对）`
+            : '模型依据不足已弃答，建议缩小范围或指定论文后重问。'}
+        </div>
+      )}
+
+      {coverageEntries.length > 1 && (
+        <div style={{ fontSize: '12px', color: '#8b87a8', margin: '6px 0' }}>
+          证据分布：
+          {coverageEntries.map(([name, count]) => (
+            <span key={name} style={{ marginLeft: '6px' }}>
+              {name}×{count}
+            </span>
+          ))}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        {claims.map((claim, index) => {
+          const style = VERDICT_STYLES[claim.verdict] || VERDICT_STYLES.no_citation
+          return (
+            <div key={index} style={{ fontSize: '12.5px', lineHeight: 1.65 }}>
+              <span style={{
+                ...style,
+                padding: '1px 7px',
+                borderRadius: '999px',
+                fontSize: '11.5px',
+                marginRight: '6px',
+              }}>
+                {style.label}
+                {typeof claim.confidence === 'number' ? ` ${Math.round(claim.confidence * 100)}%` : ''}
+              </span>
+              <span style={{ color: '#3f3a63', whiteSpace: 'pre-wrap' }}>
+                {claim.text}
+              </span>
+              {claim.evidence?.length > 0 && (
+                <span style={{ color: '#8b87a8', marginLeft: '6px' }}>
+                  → 证据 {claim.evidence.join('、')}
+                </span>
+              )}
+              {claim.issues?.length > 0 && claim.verdict !== 'supported' && (
+                <div style={{ color: '#a12b2b', fontSize: '11.5px', marginTop: '2px' }}>
+                  {claim.issues.join('；')}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
 
 export default function App() {
-  const [expandedSource, setExpandedSource] = useState(null)
   const [health, setHealth] = useState(null)
   const [papers, setPapers] = useState([])
   const [activePaper, setActivePaper] = useState(null)
@@ -25,6 +141,14 @@ export default function App() {
   const [loading, setLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [notice, setNotice] = useState('')
+  const [structure, setStructure] = useState(null)
+  const [structureOpen, setStructureOpen] = useState(false)
+  const [structureLoading, setStructureLoading] = useState(false)
+  const [structureError, setStructureError] = useState('')
+  const [compareMode, setCompareMode] = useState(false)
+  const [comparePapers, setComparePapers] = useState([])
+  const [libraryFiles, setLibraryFiles] = useState([])
+  const [writingOpen, setWritingOpen] = useState(false)
   const fileRef = useRef(null)
   const chatRef = useRef(null)
 
@@ -45,54 +169,197 @@ async function loadHealth() {
   }
 }
 
+async function loadLibrary() {
+  try {
+    const res = await fetch(`${API}/papers/status`)
+    if (!res.ok) return
+    const data = await res.json()
+    setLibraryFiles(data.indexed_files || [])
+  } catch (error) {
+    console.error('读取论文库失败：', error)
+  }
+}
+
 useEffect(() => {
   loadHealth()
+  loadLibrary()
   const timer = setInterval(loadHealth, 15000)
   return () => clearInterval(timer)
 }, [])
 
 
- async function uploadPaper(event) {
-    const file = event.target.files?.[0]
-    event.target.value = ''
-    if (!file) return
+  async function precheckPaperConflict(file, options = {}) {
+    // 上传前检查：字节完全相同 + 同编号的其他版本，返回冲突说明文本
+    let warnings = ''
+    
+    const exactForm = new FormData()
+    exactForm.append('file', file)
 
-    if (!file.name.toLowerCase().endsWith('.pdf')) {
+    const exactRes = await fetch(`${API}/papers/duplicates/check-file`, {
+      method: 'POST',
+      body: exactForm,
+    })
+
+    if (!exactRes.ok) {
+      const error = new Error(
+        '内容重复检查暂时不可用，已停止上传，请稍后重试。'
+      )
+      error.precheck = true
+      throw error
+    }
+
+    const exactData = await exactRes.json()
+
+    if (exactData.is_duplicate && exactData.matches?.length > 0) {
+      const matchedFiles = exactData.matches
+        .map(p => `已入库：${p.filename}`)
+        .join('、')
+
+      warnings += `【${file.name}】与 ${matchedFiles} 内容完全相同，继续上传会覆盖同名论文。\n`
+    }
+
+    // 上传前检查：正文级语义比对（同编号其他版本或疑似重复论文）
+    const arxivMatch = file.name.match(
+      /(?<!\d)(\d{4}\.\d{4,5})(?:v(\d+))?/i
+    )
+
+    const shouldSemanticCheck =
+      Boolean(arxivMatch) || Boolean(options.allowSemantic)
+
+    if (!shouldSemanticCheck) return warnings
+
+    try {
+      const semanticForm = new FormData()
+      semanticForm.append('file', file)
+
+      const semanticRes = await fetch(
+        `${API}/papers/duplicates/semantic-check`,
+        { method: 'POST', body: semanticForm }
+      )
+
+      const semanticData = await semanticRes.json()
+
+        
+      if (!semanticRes.ok) return warnings
+
+      if (!semanticData.best) return warnings
+
+      warnings += formatSemanticWarning(file, semanticData)
+    } catch (error) {
+      // 与原单文件上传保持一致：语义检查失败不阻断上传
+      console.error('语义查重失败：', error)
+    }
+
+    return warnings
+  }
+
+      
+  async function uploadPapers(event) {
+    const picked = Array.from(event.target.files || [])
+    event.target.value = ''
+    if (picked.length === 0 || uploading) return
+
+    const pdfFiles = picked.filter(isPdfFile)
+    const ignoredCount = picked.length - pdfFiles.length
+
+    if (pdfFiles.length === 0) {
       setNotice('目前只支持 PDF 文件。')
       return
     }
 
-    const form = new FormData()
-    form.append('file', file)
+    if (pdfFiles.length > MAX_BATCH_FILES) {
+      setNotice(
+        `一次最多批量上传 ${MAX_BATCH_FILES} 个 PDF，本次选择了 ${pdfFiles.length} 个。`
+      )
+      return
+    }
+
     setUploading(true)
     setNotice('')
 
     try {
-      const res = await fetch('/api/papers/index', {
+      const conflicts = []
+
+      for (let i = 0; i < pdfFiles.length; i += 1) {
+        setNotice(`正在检查 ${i + 1}/${pdfFiles.length}：${pdfFiles[i].name}`)
+        const warning = await precheckPaperConflict(pdfFiles[i], {
+          // 批量较大且文件名没有 arXiv 编号时，跳过昂贵的语义比对
+          allowSemantic: pdfFiles.length <= 3,
+        })
+        if (warning) conflicts.push(warning)
+      }
+
+      if (conflicts.length > 0) {
+        const confirmed = window.confirm(
+          `检测到 ${conflicts.length} 个文件存在重复或版本冲突：\n\n` +
+          `${conflicts.join('\n')}\n` +
+          `继续上传会重新索引这些文件。\n` +
+          `选择“取消”不会修改已有论文。`
+        )
+
+        if (!confirmed) {
+          setNotice('已取消批量上传，现有论文未修改。')
+          return
+        }
+      }
+
+      setNotice(`正在上传并索引 ${pdfFiles.length} 个 PDF，请稍候…`)
+
+      const form = new FormData()
+      pdfFiles.forEach(file => form.append('files', file))
+
+      const res = await fetch(`${API}/papers/batch-index`, {
         method: 'POST',
         body: form,
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.detail || '论文上传失败')
+      if (!res.ok) throw new Error(data.detail || '批量上传失败')
 
-      
-const newPaper = {
-  id: `${file.name}-${Date.now()}`,
-  name: file.name,
-  result: data,
-}
+      const results = data.results || []
+      const succeeded = results.filter(
+        item => item.status === 'indexed' && item.filename
+      )
+      const problems = results
+        .filter(item => item.status !== 'indexed')
+        .map(item => `${item.filename}：${item.error || '未知原因'}`)
 
-setPapers(prev => [
-  newPaper,
-  ...prev.filter(p => p.name !== file.name),
-])
+      if (succeeded.length > 0) {
+        const filesByName = new Map(pdfFiles.map(file => [file.name, file]))
+        const uploaded = succeeded.map(item => ({
+          id: `${item.filename}-${Date.now()}`,
+          name: item.filename,
+          result: item,
+          file: filesByName.get(item.filename) || null,
+        }))
 
-setActivePaper(newPaper)
+        setPapers(prev => {
+          const names = new Set(uploaded.map(p => p.name))
+          return [...uploaded, ...prev.filter(p => !names.has(p.name))]
+        })
 
-      setNotice(`已提交：${file.name}。请确认后端返回的入库结果。`)
+        setActivePaper(uploaded[uploaded.length - 1])
+      }
+
+      const summary =
+        `批量上传结束：成功 ${data.indexed_count ?? succeeded.length} 个` +
+        (data.skipped_count ? `，跳过 ${data.skipped_count} 个` : '') +
+        (data.failed_count ? `，失败 ${data.failed_count} 个` : '') +
+        (ignoredCount > 0 ? `；另有 ${ignoredCount} 个非 PDF 文件已忽略` : '')
+
+      setNotice(
+        problems.length > 0
+          ? `${summary}\n失败原因：\n${problems.join('\n')}`
+          : summary
+      )
+
       await loadHealth()
+      await loadLibrary()
     } catch (error) {
-      setNotice(`上传失败：${error.message}`)
+      setNotice(
+        error.precheck
+          ? error.message
+          : `批量上传失败：${error.message}`
+      )
     } finally {
       setUploading(false)
     }
@@ -102,42 +369,59 @@ setActivePaper(newPaper)
     event?.preventDefault()
     const text = question.trim()
     if (!text || loading) return
-    if (!activePaper) {
-  setNotice('请先上传并选择一篇论文，再开始提问。')
-  return
-}
+
+    const compare = compareMode && comparePapers.length >= 2
+    if (!compare && !activePaper) {
+      setNotice('请先上传并选择一篇论文，再开始提问。')
+      return
+    }
 
     setMessages(prev => [...prev, { role: 'user', content: text }])
     setQuestion('')
     setLoading(true)
     setNotice('')
 
+    const payload = compare
+      ? {
+          question: text,
+          model,
+          mode: 'compare',
+          filenames: comparePapers,
+          top_k: 6,
+        }
+      : {
+          question: text,
+          model,
+          mode: 'single',
+          filename: activePaper?.name ?? null,
+        }
+
     try {
       const res = await fetch(`${API}/papers/ask`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-       body: JSON.stringify({
-  question: text,
-  model,
-  filename: activePaper?.name ?? null,
-}),
+        body: JSON.stringify(payload),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.detail || '问答请求失败')
 
       const answer =
-        data.answer ??
-        data.response ??
-        data.result ??
-        data.message ??
-        JSON.stringify(data, null, 2)
+        data.answer ||
+        data.message ||
+        data.response ||
+        data.result ||
+        '（模型未返回内容）'
 
       setMessages(prev => [
         ...prev,
         {
           role: 'assistant',
           content: typeof answer === 'string' ? answer : JSON.stringify(answer, null, 2),
-          sources: data.sources || data.references || data.contexts || [],
+          sources: data.evidence || data.sources || [],
+          verification: data.verification || null,
+          abstained: Boolean(data.abstained),
+          coverage: data.coverage || null,
+          generationError: data.error || '',
         },
       ])
     } catch (error) {
@@ -151,6 +435,41 @@ setActivePaper(newPaper)
       ])
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function openStructure(paper) {
+    const target = paper || activePaper
+    if (!target) {
+      setNotice('请先上传并选择一篇论文，再做结构化解析。')
+      return
+    }
+    if (!target.file) {
+      setNotice('该论文缺少原始文件（可能来自上一次会话），请重新上传后再解析。')
+      return
+    }
+
+    setStructureOpen(true)
+    setStructureLoading(true)
+    setStructureError('')
+    setStructure(null)
+
+    try {
+      const form = new FormData()
+      form.append('file', target.file)
+
+      const res = await fetch(
+        `${API}/papers/structure?ocr=true&ocr_max_pages=20`,
+        { method: 'POST', body: form }
+      )
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.detail || '结构化解析失败')
+
+      setStructure(data)
+    } catch (error) {
+      setStructureError(error.message)
+    } finally {
+      setStructureLoading(false)
     }
   }
 
@@ -192,11 +511,8 @@ setActivePaper(newPaper)
           <button className="nav-item" onClick={() => fileRef.current?.click()}>
             <FolderOpen size={18} /> 论文资料库
           </button>
-          <button className="nav-item" onClick={() => setNotice('引用图谱模块将在后续版本中实现。')}>
-            <BookOpen size={18} /> 引用与文献
-          </button>
-          <button className="nav-item" onClick={() => setNotice('研究规划 Agent 将在后续版本中实现。')}>
-            <Sparkles size={18} /> 研究任务规划
+          <button className="nav-item" onClick={() => setWritingOpen(true)}>
+            <Sparkles size={18} /> 写作辅助
           </button>
         </nav>
 
@@ -335,12 +651,13 @@ setActivePaper(newPaper)
         key={index}
         type="button"
         className="citation-link"
-        onClick={() => {
-  const target = document.getElementById(
-    `source-${index}-${sourceId}`
-  )
+        
+onClick={() => {
+  const citationId = `source-${index}-${sourceId}`
+  const target = document.getElementById(citationId)
 
-  console.log("点击证据编号：", sourceId)
+  console.log("当前消息 index：", index)
+  console.log("目标来源 ID：", citationId)
   console.log("找到来源卡片：", !!target)
 
   if (target) {
@@ -349,10 +666,9 @@ setActivePaper(newPaper)
       behavior: "smooth",
       block: "center",
     })
-  } else {
-    console.error("没有找到对应的来源卡片")
   }
 }}
+
       >
         {part}
       </button>
@@ -390,14 +706,7 @@ setActivePaper(newPaper)
 <details
   id={`source-${index}-${i + 1}`}
   className="source-item"
-  key={`${source.filename || 'paper'}-${source.page ?? 'na'}-${source.chunk_number ?? i}-${i}`}
-  onToggle={(event) => {
-  console.log("来源卡片展开状态：", event.currentTarget.open)
-}}
-  open={
-    expandedSource?.messageIndex === index &&
-    expandedSource?.sourceId === i + 1
-  }
+  key={`${source.filename || 'paper'}-${source.page ?? 'na'}-${source.anchor_type ?? 'chunk'}-${source.ref || ''}-${i}`}
 >
 
 
@@ -405,6 +714,9 @@ setActivePaper(newPaper)
               <div className="source-title">
                 <FileText size={15} />
                 <span>来源 {i + 1}</span>
+                {source.anchor_label && (
+                  <span className="source-page">{source.anchor_label}</span>
+                )}
                 {source.page != null && (
                   <span className="source-page">
                     第 {source.page} 页
@@ -416,8 +728,23 @@ setActivePaper(newPaper)
 
             <div className="source-details">
               <div className="source-filename">
-                {source.filename || source.title || '未知论文'}
+                {source.title || source.filename || '未知论文'}
               </div>
+
+              {source.filename && (
+                <div className="source-meta">文件：{source.filename}</div>
+              )}
+
+              {source.section && (
+                <div className="source-meta">章节：{source.section}</div>
+              )}
+
+              {source.ref && (
+                <div className="source-meta">
+                  编号：{source.ref}
+                  {source.year ? ` · 年份 ${source.year}` : ''}
+                </div>
+              )}
 
               {source.chunk_number != null && (
                 <div className="source-meta">
@@ -425,13 +752,19 @@ setActivePaper(newPaper)
                 </div>
               )}
 
-              {source.excerpt ? (
+              {source.excerpt || source.text ? (
                 <div className="source-excerpt">
-                  {source.excerpt}
+                  {source.excerpt || source.text}
                 </div>
               ) : (
                 <div className="source-empty">
                   后端暂未返回原文摘录。
+                </div>
+              )}
+
+              {typeof source.score === 'number' && (
+                <div className="source-meta">
+                  相关度：{source.score.toFixed(2)}
                 </div>
               )}
 
@@ -446,6 +779,15 @@ setActivePaper(newPaper)
       })}
     </div>
   </div>
+)}
+
+{message.verification && (
+  <VerificationBlock
+    verification={message.verification}
+    abstained={message.abstained}
+    coverage={message.coverage}
+    generationError={message.generationError}
+  />
 )}
 
                     </div>
@@ -464,6 +806,77 @@ setActivePaper(newPaper)
               </div>
 
               <form className="composer" onSubmit={sendQuestion}>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap' }}>
+                  <label style={{ display: 'flex', gap: '6px', alignItems: 'center', fontSize: '12.5px', color: '#5c5878' }}>
+                    <input
+                      type="checkbox"
+                      checked={compareMode}
+                      onChange={e => {
+                        setCompareMode(e.target.checked)
+                        if (!e.target.checked) setComparePapers([])
+                      }}
+                    />
+                    多篇对比
+                  </label>
+
+                  {compareMode && (
+                    <span style={{ fontSize: '12px', color: comparePapers.length >= 2 ? '#4c3fd6' : '#a12b2b' }}>
+                      已选 {comparePapers.length} 篇（至少 2 篇；库中共 {libraryFiles.length} 篇）
+                    </span>
+                  )}
+
+                  {!compareMode && activePaper && (
+                    <span style={{ fontSize: '12px', color: '#8b87a8' }}>
+                      当前论文：{activePaper.name}
+                    </span>
+                  )}
+                </div>
+
+                {compareMode && (
+                  <div style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: '6px',
+                    marginBottom: '8px',
+                    maxHeight: '92px',
+                    overflowY: 'auto',
+                  }}>
+                    {libraryFiles.length === 0 && (
+                      <span style={{ fontSize: '12px', color: '#a12b2b' }}>
+                        论文库为空，请先上传论文。
+                      </span>
+                    )}
+                    {libraryFiles.map(name => {
+                      const picked = comparePapers.includes(name)
+                      return (
+                        <button
+                          key={name}
+                          type="button"
+                          onClick={() => {
+                            setComparePapers(prev => (
+                              prev.includes(name)
+                                ? prev.filter(item => item !== name)
+                                : [...prev, name]
+                            ))
+                          }}
+                          style={{
+                            border: `1px solid ${picked ? '#7c6cff' : '#e2dffa'}`,
+                            background: picked ? '#f0edff' : '#fff',
+                            color: picked ? '#4c3fd6' : '#5c5878',
+                            borderRadius: '999px',
+                            padding: '4px 10px',
+                            fontSize: '12px',
+                            cursor: 'pointer',
+                          }}
+                          title={name}
+                        >
+                          {picked ? '✓ ' : ''}{name.length > 34 ? `${name.slice(0, 31)}…` : name}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+
                 <textarea
                   value={question}
                   onChange={e => setQuestion(e.target.value)}
@@ -473,7 +886,7 @@ setActivePaper(newPaper)
                       sendQuestion()
                     }
                   }}
-                  placeholder="例如：这篇论文采用了什么研究方法？"
+                  placeholder={compareMode ? '例如：对比两篇论文在训练配置和评价指标上的差异' : '例如：这篇论文采用了什么研究方法？'}
                   rows={2}
                   disabled={loading}
                 />
@@ -504,7 +917,8 @@ setActivePaper(newPaper)
                 <div className="divider" />
                 <div className="capability-row"><span>论文检索</span><span className="capability-enabled">已接入</span></div>
                 <div className="capability-row"><span>持久化知识库</span><span className="capability-enabled">已接入</span></div>
-                <div className="capability-row"><span>Agent 自动规划</span><span className="capability-soon">开发中</span></div>
+                <div className="capability-row"><span>版本语义查重</span><span className="capability-enabled">已接入</span></div>
+                <div className="capability-row"><span>结构化解析</span><span className="capability-enabled">已接入</span></div>
               </section>
 
               <section className="side-card upload-card">
@@ -513,7 +927,7 @@ setActivePaper(newPaper)
                   <h3>论文资料</h3>
                 </div>
                 <p className="side-card-description">
-                  上传 PDF，解析论文内容并将文本索引到知识库。
+                  支持单个或批量上传 PDF（一次最多 {MAX_BATCH_FILES} 篇），解析后索引到知识库。
                 </p>
                 <button
                   className="upload-button"
@@ -521,15 +935,26 @@ setActivePaper(newPaper)
                   disabled={uploading}
                 >
                   <Upload size={16} />
-                  {uploading ? '正在上传与索引…' : '上传 PDF 论文'}
+                  {uploading ? '正在上传与索引…' : '上传 PDF 论文（可多选）'}
                 </button>
                 <input
                   ref={fileRef}
                   type="file"
                   accept=".pdf,application/pdf"
+                  multiple
                   hidden
-                  onChange={uploadPaper}
+                  onChange={uploadPapers}
                 />
+                <button
+                  className="upload-button"
+                  style={{ marginTop: '8px' }}
+                  onClick={() => openStructure()}
+                  disabled={uploading || structureLoading || !activePaper}
+                  title="抽取标题树、作者机构、表格、图表、公式与参考文献"
+                >
+                  <FileText size={16} />
+                  {structureLoading ? '正在结构化解析…' : '结构化解析当前论文'}
+                </button>
                 {papers.length > 0 && (
                   <div className="uploaded-summary">
                     <div className="uploaded-check">✓</div>
@@ -541,7 +966,7 @@ setActivePaper(newPaper)
                 )}
                 <div className="upload-tip">
                   <FileText size={15} />
-                  <span>建议使用可复制文本的 PDF 文件。</span>
+                  <span>扫描件会自动 OCR；解析可抽取标题树、表格、图表与公式。</span>
                 </div>
               </section>
 
@@ -555,12 +980,50 @@ setActivePaper(newPaper)
             </aside>
           </div>
 
-          {notice && (
-            <div className="notice-bar">
-              <span>{notice}</span>
-              <button onClick={() => setNotice('')} aria-label="关闭提示">×</button>
-            </div>
-          )}
+          
+{notice && (
+  <div
+    style={{
+      position: 'fixed',
+      top: '20px',
+      left: '50%',
+      transform: 'translateX(-50%)',
+      zIndex: 99999,
+      background: '#fff',
+      color: '#333',
+      border: '1px solid #7c6cff',
+      borderRadius: '8px',
+      padding: '14px 20px',
+      boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+      maxWidth: '760px',
+      maxHeight: '70vh',
+      overflowY: 'auto',
+    }}
+  >
+    <span style={{ whiteSpace: 'pre-line' }}>{notice}</span>
+    <button
+      onClick={() => setNotice('')}
+      style={{ marginLeft: '16px', cursor: 'pointer' }}
+      aria-label="关闭提示"
+    >
+      ×
+    </button>
+  </div>
+)}
+
+
+          <StructurePanel
+            open={structureOpen}
+            loading={structureLoading}
+            data={structure}
+            error={structureError}
+            onClose={() => setStructureOpen(false)}
+          />
+
+          <WritingPanel
+            open={writingOpen}
+            onClose={() => setWritingOpen(false)}
+          />
 
           <footer className="page-footer">
             <span>ResearchPilot · AI Research Workspace</span>
