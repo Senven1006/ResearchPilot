@@ -1522,9 +1522,11 @@ async def ask_paper(request: PaperQuestion):
             "sources": [],
             "verification": {
                 "claims": [],
+                "mode": "skipped",
                 "grounding": {
                     "total": 0, "supported": 0, "weak": 0,
-                    "unsupported": 0, "no_citation": 0, "score": 0.0,
+                    "unsupported": 0, "no_citation": 0, "unverified": 0,
+                    "numeric_issues": 0, "score": 0.0,
                 },
                 "abstained": True,
             },
@@ -1588,13 +1590,17 @@ async def ask_paper(request: PaperQuestion):
                 )
                 for item in evidence
             },
+            # 降级模式没有语义嵌入，只做数字/引用核验，避免误判为编造
+            semantic=embedding.current_backend() == "ollama",
         )
     else:
         verification = {
             "claims": [],
+            "mode": "skipped",
             "grounding": {
                 "total": 0, "supported": 0, "weak": 0,
-                "unsupported": 0, "no_citation": 0, "score": 0.0,
+                "unsupported": 0, "no_citation": 0, "unverified": 0,
+                "numeric_issues": 0, "score": 0.0,
             },
             "abstained": bool(generation_error),
         }

@@ -579,18 +579,30 @@ async def verify_claims(
     embed_fn,
     evidence_locations: dict[int, str] | None = None,
     batch_size: int = 32,
+    semantic: bool = True,
 ) -> dict:
-    """逐条核验答案断言：语义支持度 + 数字一致性（数字来自锚点也认可）。"""
+    """逐条核验答案断言：语义支持度 + 数字一致性（数字来自锚点也认可）。
+
+    semantic=False 表示当前没有可用的语义嵌入后端（降级模式）：
+    此时只做数字/引用核验，断言标记为「未核验」，避免把正确回答误判为编造。
+    """
     claims = split_claims(answer)
+    mode = "semantic" if semantic else "numeric_only"
+
     if not claims:
         return {
             "claims": [],
+            "mode": mode,
             "grounding": {
                 "total": 0, "supported": 0, "weak": 0,
-                "unsupported": 0, "no_citation": 0, "score": 0.0,
+                "unsupported": 0, "no_citation": 0, "unverified": 0,
+                "numeric_issues": 0, "score": 0.0,
             },
             "abstained": _is_abstained(answer),
         }
+
+    if not semantic:
+        return _verify_by_numbers(claims, evidence_texts, evidence_locations, answer)
 
     claim_texts = [claim["text"] for claim in claims]
     cited_ids = sorted({
@@ -613,7 +625,10 @@ async def verify_claims(
 
     position = {number: index for index, number in enumerate(cited_ids)}
     results = []
-    counters = {"supported": 0, "weak": 0, "unsupported": 0, "no_citation": 0}
+    counters = {
+        "supported": 0, "weak": 0, "unsupported": 0,
+        "no_citation": 0, "unverified": 0,
+    }
 
     for index, claim in enumerate(claims):
         cited = [number for number in claim["evidence"] if number in evidence_texts]
@@ -637,8 +652,8 @@ async def verify_claims(
                 )
             issues = check_numbers(claim["text"], haystack)
 
-            semantic = min(1.0, best / CLAIM_SIM_SUPPORTED) if best else 0.0
-            confidence = round(0.65 * semantic + 0.35 * (0.0 if issues else 1.0), 3)
+            semantic_score = min(1.0, best / CLAIM_SIM_SUPPORTED) if best else 0.0
+            confidence = round(0.65 * semantic_score + 0.35 * (0.0 if issues else 1.0), 3)
 
             if confidence >= 0.75:
                 verdict = "supported"
@@ -665,10 +680,71 @@ async def verify_claims(
 
     return {
         "claims": results,
+        "mode": mode,
         "grounding": {
             "total": total,
             **counters,
+            "numeric_issues": 0,
             "score": round(weighted / total, 3) if total else 0.0,
+        },
+        "abstained": _is_abstained(answer),
+    }
+
+
+def _verify_by_numbers(
+    claims: list[dict],
+    evidence_texts: dict[int, str],
+    evidence_locations: dict[int, str] | None,
+    answer: str,
+) -> dict:
+    """降级模式：只校验数字与引用编号，语义支持度标记为「未核验」。"""
+    results = []
+    counters = {
+        "supported": 0, "weak": 0, "unsupported": 0,
+        "no_citation": 0, "unverified": 0,
+    }
+    numeric_issues = 0
+
+    for claim in claims:
+        cited = [number for number in claim["evidence"] if number in evidence_texts]
+
+        if not cited:
+            verdict = "no_citation"
+            issues = ["该句没有标注证据编号"]
+        else:
+            haystack = [evidence_texts[number] for number in cited]
+            if evidence_locations:
+                haystack.extend(
+                    evidence_locations.get(number, "") for number in cited
+                )
+            issues = check_numbers(claim["text"], haystack)
+            if issues:
+                verdict = "weak"
+                numeric_issues += 1
+            else:
+                verdict = "unverified"
+                issues = ["离线嵌入模式：仅校验数字与引用，未做语义核验"]
+
+        counters[verdict] += 1
+        results.append({
+            "text": claim["text"][:400],
+            "evidence": cited,
+            "support": None,
+            "confidence": None,
+            "verdict": verdict,
+            "issues": issues,
+        })
+
+    total = len(results)
+
+    return {
+        "claims": results,
+        "mode": "numeric_only",
+        "grounding": {
+            "total": total,
+            **counters,
+            "numeric_issues": numeric_issues,
+            "score": None,
         },
         "abstained": _is_abstained(answer),
     }

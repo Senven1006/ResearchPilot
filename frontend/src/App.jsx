@@ -41,12 +41,17 @@ const VERDICT_STYLES = {
   weak: { label: '弱支持', background: '#fff5e5', color: '#9a6100' },
   unsupported: { label: '未支持', background: '#fff0f0', color: '#a12b2b' },
   no_citation: { label: '无引用', background: '#f3f4f6', color: '#4b5563' },
+  unverified: { label: '未核验', background: '#eef4ff', color: '#1d4ed8' },
 }
 
 function VerificationBlock({ verification, abstained, coverage, generationError }) {
   const claims = verification?.claims || []
   const grounding = verification?.grounding || {}
-  const score = Math.round((grounding.score || 0) * 100)
+  const mode = verification?.mode || 'semantic'
+  const numericOnly = mode === 'numeric_only'
+  const score = typeof grounding.score === 'number'
+    ? Math.round(grounding.score * 100)
+    : null
   const coverageEntries = Object.entries(coverage || {})
 
   if (!claims.length && !abstained && !generationError) return null
@@ -58,10 +63,27 @@ function VerificationBlock({ verification, abstained, coverage, generationError 
         <strong>抗幻觉核验</strong>
         {grounding.total > 0 && (
           <span className="sources-count">
-            支持度 {score}% · 共 {grounding.total} 条断言
+            {numericOnly
+              ? `离线模式 · 仅数字核验 · 共 ${grounding.total} 条断言`
+              : `支持度 ${score ?? 0}% · 共 ${grounding.total} 条断言`}
           </span>
         )}
       </div>
+
+      {numericOnly && (
+        <div style={{
+          margin: '8px 0',
+          padding: '8px 10px',
+          borderRadius: '8px',
+          background: '#eef4ff',
+          color: '#1d4ed8',
+          fontSize: '12px',
+          lineHeight: 1.6,
+        }}>
+          当前未启用 Ollama 语义嵌入，核验只检查数字与引用编号是否出现在证据中；
+          语义支持度需要启动 Ollama 并重新索引后才会给出。
+        </div>
+      )}
 
       {(abstained || generationError) && (
         <div style={{
@@ -113,7 +135,9 @@ function VerificationBlock({ verification, abstained, coverage, generationError 
                   → 证据 {claim.evidence.join('、')}
                 </span>
               )}
-              {claim.issues?.length > 0 && claim.verdict !== 'supported' && (
+              {claim.issues?.length > 0
+                && claim.verdict !== 'supported'
+                && claim.verdict !== 'unverified' && (
                 <div style={{ color: '#a12b2b', fontSize: '11.5px', marginTop: '2px' }}>
                   {claim.issues.join('；')}
                 </div>
