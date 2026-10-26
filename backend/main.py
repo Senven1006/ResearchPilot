@@ -16,6 +16,7 @@ from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
 
 import dataviz
+import embedding
 from pdf_structure import StructureParser
 from translation import (
     TranslationError,
@@ -124,15 +125,40 @@ app = FastAPI(
 # Chroma 将向量和元数据保存到磁盘，重启后自动加载
 Path(CHROMA_PATH).mkdir(parents=True, exist_ok=True)
 chroma_client = chromadb.PersistentClient(path=CHROMA_PATH)
-collection = chroma_client.get_or_create_collection(
-    name="research_papers",
-    metadata={"hnsw:space": "cosine"},
-)
-# 结构化检索单元：段落/表格/图表/公式/参考文献/元信息，每块带位置锚点
-unit_collection = chroma_client.get_or_create_collection(
-    name=UNIT_COLLECTION_NAME,
-    metadata={"hnsw:space": "cosine"},
-)
+
+# 嵌入后端在「Ollama 可用」与「离线哈希降级」之间自动切换；
+# 两种后端的向量空间不兼容，因此按后端后缀使用不同的集合，避免混写。
+embedding.configure(OLLAMA_URL, EMBED_MODEL, LOCAL_MODEL)
+
+_chroma_pairs: dict[str, tuple] = {}
+
+
+def _collection_pair(backend: str) -> tuple:
+    suffix = embedding.collection_suffix(backend)
+
+    if suffix not in _chroma_pairs:
+        _chroma_pairs[suffix] = (
+            chroma_client.get_or_create_collection(
+                name=f"research_papers{suffix}",
+                metadata={"hnsw:space": "cosine"},
+            ),
+            chroma_client.get_or_create_collection(
+                name=f"{UNIT_COLLECTION_NAME}{suffix}",
+                metadata={"hnsw:space": "cosine"},
+            ),
+        )
+
+    return _chroma_pairs[suffix]
+
+
+def chunk_store():
+    """当前嵌入后端对应的段落块集合。"""
+    return _collection_pair(embedding.current_backend())[0]
+
+
+def unit_store():
+    """当前嵌入后端对应的结构化单元集合。"""
+    return _collection_pair(embedding.current_backend())[1]
 
 deepseek_client = None
 if DEEPSEEK_KEY:
@@ -196,32 +222,52 @@ async def ollama_post(path: str, payload: dict):
 
 
 async def embed_texts(texts: list[str]) -> list[list[float]]:
-    result = await ollama_post(
-        "/api/embed",
-        {"model": EMBED_MODEL, "input": texts},
-    )
-    vectors = result.get("embeddings", [])
-    if len(vectors) != len(texts):
-        raise HTTPException(
-            status_code=502,
-            detail="嵌入模型返回的向量数量不正确。",
-        )
-    return vectors
+    """生成向量：Ollama 可用时用 nomic-embed-text，否则降级为离线哈希嵌入。
+
+    运行期 Ollama 掉线时会在这一次调用内自动切换后端，避免整条链路失败。
+    """
+    state = await embedding.detect()
+
+    if state["backend"] == "ollama":
+        try:
+            result = await ollama_post(
+                "/api/embed",
+                {"model": EMBED_MODEL, "input": texts},
+            )
+            vectors = result.get("embeddings", [])
+            if len(vectors) != len(texts):
+                raise HTTPException(
+                    status_code=502,
+                    detail="嵌入模型返回的向量数量不正确。",
+                )
+            return vectors
+        except HTTPException:
+            # Ollama 刚刚不可用：强制重新探测，确实降级后再用哈希向量
+            if (await embedding.detect(force=True))["backend"] == "ollama":
+                raise
+
+    return embedding.hash_embed(texts)
 
 
 async def generate_answer(prompt: str, model: str) -> tuple[str, str]:
     if model == "local":
-        result = await ollama_post(
-            "/api/chat",
-            {
-                "model": LOCAL_MODEL,
-                "messages": [
-                    {"role": "user", "content": prompt}
-                ],
-                "stream": False,
-            },
-        )
-        return result["message"]["content"], LOCAL_MODEL
+        try:
+            result = await ollama_post(
+                "/api/chat",
+                {
+                    "model": LOCAL_MODEL,
+                    "messages": [
+                        {"role": "user", "content": prompt}
+                    ],
+                    "stream": False,
+                },
+            )
+            return result["message"]["content"], LOCAL_MODEL
+        except HTTPException:
+            # 本地模型不可用时退回在线模型，保证功能可用
+            if deepseek_client is None:
+                raise
+            model = "deepseek"
 
     if model == "deepseek":
         if deepseek_client is None:
@@ -307,12 +353,19 @@ def root():
 
 
 @app.get("/health")
-def health():
+async def health():
+    state = await embedding.detect()
+    status = embedding.describe(state)
+
     return {
         "status": "ok",
-        "chroma_chunks": collection.count(),
-        "structured_units": unit_collection.count(),
+        "chroma_chunks": chunk_store().count(),
+        "structured_units": unit_store().count(),
         "deepseek_configured": deepseek_client is not None,
+        "embedding": status,
+        "local_chat_available": status["chat_model_ready"],
+        "local_chat_model": LOCAL_MODEL,
+        "fallback_mode": status["backend"] != "ollama",
     }
 
 
@@ -416,10 +469,50 @@ async def get_structure_figure(doc_id: str, name: str):
     return FileResponse(path, media_type="image/png")
 
 
-def resolve_model(model: str) -> str:
-    if model and model != "auto":
-        return model
-    return "deepseek" if deepseek_client is not None else "local"
+async def resolve_model(model: str) -> str:
+    """选择实际使用的对话模型：本地不可用时自动回落到在线模型。"""
+    await embedding.detect()
+    state = embedding.snapshot()
+    local_ready = bool(state.get("chat_model_ready"))
+
+    requested = (model or "auto").strip().lower()
+
+    if requested == "local":
+        if local_ready:
+            return "local"
+        if deepseek_client is not None:
+            return "deepseek"
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "本地模型不可用（Ollama 未运行或未下载 qwen2.5:7b），"
+                "且未配置 DEEPSEEK_API_KEY，无法调用任何模型。"
+            ),
+        )
+
+    if requested == "deepseek":
+        if deepseek_client is not None:
+            return "deepseek"
+        if local_ready:
+            return "local"
+        raise HTTPException(
+            status_code=503,
+            detail="未配置 DEEPSEEK_API_KEY，且本地 Ollama 不可用。",
+        )
+
+    # auto：在线优先，其次本地
+    if deepseek_client is not None:
+        return "deepseek"
+    if local_ready:
+        return "local"
+
+    raise HTTPException(
+        status_code=503,
+        detail=(
+            "没有可用模型：请在 backend/.env 配置 DEEPSEEK_API_KEY，"
+            "或启动 Ollama 并下载 qwen2.5:7b 后重启后端。"
+        ),
+    )
 
 
 _snippet_cache: dict[str, str] = {}
@@ -439,7 +532,7 @@ async def translate_snippet(request: TranslateSnippet):
     if len(text) > 1500:
         raise HTTPException(status_code=413, detail="单次划词翻译不超过 1500 字符。")
 
-    model = resolve_model(request.model)
+    model = await resolve_model(request.model)
     cache_key = f"{model}|{text}"
     if cache_key in _snippet_cache:
         return {
@@ -489,7 +582,7 @@ async def translate_paper_structure(
         )
 
     structure = json.loads(path.read_text(encoding="utf-8"))
-    resolved = resolve_model(model)
+    resolved = await resolve_model(model)
 
     section_ids = [
         item.strip() for item in (sections or "").split(",") if item.strip()
@@ -567,13 +660,13 @@ async def embed_and_store_chunks(
             item["vector"] = vector
 
     # 同名文件重新索引时替换原有记录
-    collection.delete(where={"filename": filename})
+    chunk_store().delete(where={"filename": filename})
 
     identity = extract_paper_identity(filename)
 
     for start in range(0, len(chunks), EMBED_BATCH_SIZE):
         batch = chunks[start:start + EMBED_BATCH_SIZE]
-        collection.upsert(
+        chunk_store().upsert(
             ids=[item["id"] for item in batch],
             embeddings=[item["vector"] for item in batch],
             documents=[item["text"] for item in batch],
@@ -669,19 +762,19 @@ async def index_structure_units(
 
     unit_warnings: list[str] = []
     try:
-        existing = unit_collection.get(
+        existing = unit_store().get(
             where={"filename": filename}, include=["metadatas"]
         )
         stale_ids = existing.get("ids") or []
         if stale_ids:
-            unit_collection.delete(ids=stale_ids)
+            unit_store().delete(ids=stale_ids)
     except Exception as exc:  # noqa: BLE001
         # 索引损坏时不要中断上传，交给后续 upsert 覆盖同 id
         unit_warnings.append(f"旧单元清理失败：{exc}")
 
     for start in range(0, len(units), EMBED_BATCH_SIZE):
         batch = units[start:start + EMBED_BATCH_SIZE]
-        unit_collection.upsert(
+        unit_store().upsert(
             ids=[item["unit_id"] for item in batch],
             embeddings=vectors[start:start + EMBED_BATCH_SIZE],
             documents=[item["text"] for item in batch],
@@ -759,7 +852,7 @@ async def index_pdf(file: UploadFile = File(...), structure: bool = True):
     return {
         "message": "论文已写入 ChromaDB",
         **result,
-        "total_chunks": collection.count(),
+        "total_chunks": chunk_store().count(),
         "database_path": CHROMA_PATH,
     }
 
@@ -835,13 +928,13 @@ async def batch_index_pdfs(
         "failed_count": failed_count,
         "skipped_count": skipped_count,
         "results": results,
-        "total_chunks": collection.count(),
+        "total_chunks": chunk_store().count(),
         "database_path": CHROMA_PATH,
     }
 
 def find_indexed_arxiv_papers(arxiv_id: str) -> dict:
     """查找 ChromaDB 中已索引的同一篇 arXiv 论文。"""
-    result = collection.get(
+    result = chunk_store().get(
         where={"arxiv_id": arxiv_id},
         include=["metadatas"],
     )
@@ -921,7 +1014,7 @@ async def check_duplicate_pdf(file: UploadFile = File(...)):
     content = await file.read()
     file_sha256 = hashlib.sha256(content).hexdigest()
 
-    result = collection.get(
+    result = chunk_store().get(
         where={"file_sha256": file_sha256},
         include=["metadatas"],
     )
@@ -953,10 +1046,10 @@ async def check_duplicate_pdf(file: UploadFile = File(...)):
 
 def indexed_paper_filenames() -> list[str]:
     """按首次出现顺序返回已入库的文件名。"""
-    if collection.count() == 0:
+    if chunk_store().count() == 0:
         return []
 
-    records = collection.get(include=["metadatas"])
+    records = chunk_store().get(include=["metadatas"])
     names = []
     seen = set()
 
@@ -972,7 +1065,7 @@ def indexed_paper_filenames() -> list[str]:
 
 def indexed_chunk_vectors(filename: str) -> list[list[float]]:
     """取已入库文件的全部分块向量，用于候选粗筛。"""
-    result = collection.get(
+    result = chunk_store().get(
         where={"filename": filename},
         include=["embeddings"],
     )
@@ -988,7 +1081,7 @@ def load_indexed_pages(filename: str) -> list[dict]:
     split_text 相邻分块只在开头重叠 CHUNK_OVERLAP 个字符，
     所以把后续分块去掉末尾这段重叠再拼接，即可还原该页正文。
     """
-    result = collection.get(
+    result = chunk_store().get(
         where={"filename": filename},
         include=["documents", "metadatas"],
     )
@@ -1062,6 +1155,9 @@ async def semantic_duplicate_check(
     compare_with: str | None = None,
 ):
     """正文级语义查重：与已入库版本逐句比对，并给出保留建议。"""
+    # 需要读取已入库向量，先确认当前嵌入后端
+    await embedding.detect()
+
     content, filename = await read_pdf(file)
     identity = extract_paper_identity(filename)
 
@@ -1174,14 +1270,14 @@ async def semantic_duplicate_check(
 
 def load_units(filenames: list[str] | None) -> list[dict]:
     """载入（可选限定文件的）结构化检索单元。"""
-    if unit_collection.count() == 0:
+    if unit_store().count() == 0:
         return []
 
     args: dict = {"include": ["documents", "metadatas"]}
     if filenames:
         args["where"] = {"filename": {"$in": list(filenames)}}
 
-    result = unit_collection.get(**args)
+    result = unit_store().get(**args)
     units = []
 
     for document, metadata in zip(
@@ -1205,6 +1301,9 @@ async def hybrid_retrieve(
     quota: dict[str, int] | None = None,
 ) -> dict:
     """向量召回 + 关键词/数字通道，RRF 融合后再做意图与数字加权。"""
+    # 先确认当前嵌入后端，避免在冷启动时读错集合
+    await embedding.detect()
+
     query_vector = (await embed_texts([question]))[0]
     intents = detect_intents(question)
     hard_terms = extract_hard_terms(question)
@@ -1217,7 +1316,7 @@ async def hybrid_retrieve(
     if filenames:
         query_args["where"] = {"filename": {"$in": list(filenames)}}
 
-    vector_result = unit_collection.query(**query_args)
+    vector_result = unit_store().query(**query_args)
     vector_ids = [
         metadata["unit_id"]
         for metadata in (vector_result.get("metadatas") or [[]])[0]
@@ -1377,7 +1476,7 @@ def _compare_prompt(
 
 @app.post("/papers/ask")
 async def ask_paper(request: PaperQuestion):
-    if unit_collection.count() == 0 and collection.count() == 0:
+    if unit_store().count() == 0 and chunk_store().count() == 0:
         raise HTTPException(
             status_code=400,
             detail="论文库为空，请先调用 POST /papers/index。",
@@ -1465,12 +1564,8 @@ async def ask_paper(request: PaperQuestion):
         else _single_prompt(question, evidence_text)
     )
 
-    # auto 先使用 DeepSeek；未配置 Key 时退回本地模型
-    selected_model = request.model
-    if selected_model == "auto":
-        selected_model = (
-            "deepseek" if deepseek_client is not None else "local"
-        )
+    # 显式选择了本地模型但不可用时，resolve_model 会自动回落到在线模型
+    selected_model = await resolve_model(request.model)
 
     generation_error = ""
     try:
@@ -1530,17 +1625,20 @@ async def ask_paper(request: PaperQuestion):
 
 
 @app.get("/papers/status")
-def papers_status():
-    total = collection.count()
-    units = unit_collection.count()
+async def papers_status():
+    state = await embedding.detect()
+    total = chunk_store().count()
+    units = unit_store().count()
+
     if total == 0 and units == 0:
         return {
             "indexed_chunks": 0,
             "indexed_units": 0,
             "indexed_files": [],
+            "embedding_backend": state["backend"],
         }
 
-    records = collection.get(include=["metadatas"])
+    records = chunk_store().get(include=["metadatas"])
     filenames = sorted({
         item["filename"] for item in records["metadatas"] if item
     })
@@ -1548,6 +1646,7 @@ def papers_status():
         "indexed_chunks": total,
         "indexed_units": units,
         "indexed_files": filenames,
+        "embedding_backend": state["backend"],
     }
 
 
@@ -1648,7 +1747,7 @@ async def writing_outline(request: OutlineRequest):
     if len(idea) < 4:
         raise HTTPException(status_code=400, detail="请给出更具体的 idea（至少 4 个字符）。")
 
-    if unit_collection.count() == 0:
+    if unit_store().count() == 0:
         raise HTTPException(
             status_code=400,
             detail=(
@@ -1676,7 +1775,7 @@ async def writing_outline(request: OutlineRequest):
             detail="未能从论文库检索到与 idea 相关的文献，请补充论文或换个 idea。",
         )
 
-    model = resolve_model(request.model)
+    model = await resolve_model(request.model)
     prompt = build_outline_prompt(idea, references)
 
     try:
@@ -1689,7 +1788,7 @@ async def writing_outline(request: OutlineRequest):
     citations = validate_citations(output or "", len(references))
 
     caveats = [
-        f"参考文献均来自你已索引的论文（当前库内 {unit_collection.count()} 个结构化单元），未调用外部检索。",
+        f"参考文献均来自你已索引的论文（当前库内 {unit_store().count()} 个结构化单元），未调用外部检索。",
         "框架中的引用编号形如 [R1]..[Rn]，对应下方 references 列表；越界编号会在 citations 中标记。",
     ]
     if any(item["year"] is None for item in references):
@@ -1707,7 +1806,7 @@ async def writing_outline(request: OutlineRequest):
         "citations": citations,
         "raw": output or "",
         "caveats": caveats,
-        "library_units": unit_collection.count(),
+        "library_units": unit_store().count(),
     }
 
 
@@ -1718,7 +1817,7 @@ async def writing_diagrams(request: DiagramRequest):
     if len(idea) < 4:
         raise HTTPException(status_code=400, detail="请描述要画的架构（至少 4 个字符）。")
 
-    model = resolve_model(request.model)
+    model = await resolve_model(request.model)
 
     try:
         output, actual_model = await generate_answer(build_diagram_prompt(idea), model)
@@ -1751,7 +1850,7 @@ async def writing_translate(request: AcademicTranslateRequest):
     if len(text) > 20000:
         raise HTTPException(status_code=413, detail="单次翻译不超过 20000 字符。")
 
-    model = resolve_model(request.model)
+    model = await resolve_model(request.model)
 
     try:
         result = await translate_academic(text, generate_answer, model)
