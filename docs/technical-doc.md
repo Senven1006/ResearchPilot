@@ -295,6 +295,8 @@ if request == "auto":                       return "deepseek" if key else ("loca
 
 关键实现细节：`load_indexed_pages()` 从 800 字重叠分块**精确还原**每页正文——相邻分块只在开头重叠 `CHUNK_OVERLAP=120` 字符，按"最长重叠后缀"拼接即可，不需要额外存原文快照。
 
+原件留档的入口在侧栏论文列表：每篇论文右侧按 `files[].downloadable` 渲染一个下载图标，链接是 `<a href="/api/papers/file/<sha256>?token=…">`。之所以用链接而不是 `fetch`，是因为浏览器原生下载不需要把整份 PDF 读进内存；代价是资源类请求无法带自定义头，因此令牌走查询参数（与裁图、SVG 图表同一处理方式）。
+
 ## 5.2 版式感知的结构化解析
 
 **标题树**：优先使用 PDF 书签（`get_toc`）；无书签时用字号加权中位数估出正文字号，以"字号 ≥ 1.12 倍正文""加粗且不小于正文"或"编号前缀"作为候选，按字号排名与编号点分深度（`1` / `1.1` / `1.1.1`）定级。TOC 标题的定位方式是在其所在页**按标题文本匹配**块位置（归一化后前缀匹配），再强制位置单调递增——这一改动修掉了"同一页多个章节时后续节拿到 0 段"的结构性缺陷。
@@ -399,7 +401,7 @@ if request == "auto":                       return "deepseek" if key else ("loca
 | 可视化 | 3 类 × 数值 CSV | 柱状图生成，图注含最高/最低与极差占比 |
 | 前端 | 构建与静态检查 | `vite build` 339ms 通过；ESLint 0 error / 0 warning |
 | 自动化 | `python -m pytest`（15 用例） | 15 passed，3.2s，全程离线 |
-| 自动化 | 原件留档 | 入库后 `/papers/status` 标记 `downloadable=true`，取回内容以 `%PDF-` 开头 |
+| 自动化 | 原件留档与下载 | `/papers/status` 的 `files[]` 两条均 `downloadable=true`；`GET /papers/file/{sha256}` 返回 2,125,019 字节、头为 `%PDF-1.5`，与留档文件大小一致 |
 | 自动化 | 断言核验（对抗） | 正确数字判"支持"，伪造数字被标出，降级模式降为 `unverified` |
 | 自动化 | 鉴权开关 | 无 token / 错 token → 401；header 与 `?token=` 均 → 200；公开路径与 OPTIONS 预检放行 |
 | 自动化 | CI | GitHub Actions 后端 pytest + 前端 lint / 查重回归 / build 双流水线通过 |

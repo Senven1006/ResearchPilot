@@ -169,7 +169,7 @@ npm run dev                     # 默认 http://localhost:5173
 3. 打开「结构化解析」→ 查看标题树 / 表格 / 图表 / 公式 / 参考文献。
 4. 点「中英对照」→ 当前章节先出译文，读完点「继续翻译」译下一节。
 5. 侧栏「写作辅助」→ 生成框架（参考文献来自库内论文）、上传 CSV 出图表与图注。
-6. 点原文下载按钮 → 从 `data/papers/` 取回入库时留档的原始 PDF（见 §6 的 `/papers/file/{sha256}`）。
+6. 侧栏论文列表里，每篇论文名右侧有一个下载图标（鼠标移上去才显示）→ 点它取回入库时留档的原始 PDF（见 §6 的 `/papers/file/{sha256}`）。
 
 ### 4.5 本地测试与 CI
 
@@ -227,7 +227,7 @@ ALLOW_ORIGINS=http://127.0.0.1:5173
 
 ### 5.2 原件留档
 
-入库时除了切分单元和向量，还会把原始 PDF 存一份到 `data/papers/<sha256>.pdf`（该目录已在 `.gitignore` 里）。`GET /papers/status` 的 `files[]` 会给出 `downloadable` 与 `file_url`，前端据此决定是否显示下载按钮。留档失败不影响入库（返回 `archived: false`），只是哈希校验这一环弱一些。
+入库时除了切分单元和向量，还会把原始 PDF 存一份到 `data/papers/<sha256>.pdf`（该目录已在 `.gitignore` 里）。`GET /papers/status` 的 `files[]` 会给出 `downloadable` 与 `file_url`：侧栏论文列表据此在每篇右侧显示下载图标（`downloadable=false` 时不显示），链接走 `?token=` 携带令牌，所以设置 `API_TOKEN` 后依然能直接点开下载。留档失败不影响入库（返回 `archived: false`），只是哈希校验这一环弱一些。
 
 完整模板见 [`backend/.env.example`](backend/.env.example)。`backend/.env` 已被 `.gitignore` 忽略，**请勿提交真实密钥**。
 
