@@ -6,8 +6,9 @@
 
 ---
 
-> 交付文档：技术文档见 [`docs/ResearchPilot-技术文档.pdf`](docs/ResearchPilot-技术文档.pdf)（20 页），
+> 交付文档：技术文档见 [`docs/ResearchPilot-technical-doc.pdf`](docs/ResearchPilot-technical-doc.pdf)（20 页），
 > 源文件为 [`docs/technical-doc.md`](docs/technical-doc.md)，由 [`docs/md_to_pdf.py`](docs/md_to_pdf.py) 渲染。
+> 直链下载：<https://raw.githubusercontent.com/Senven1006/ResearchPilot/main/docs/ResearchPilot-technical-doc.pdf>
 
 ## 1. 功能一览
 

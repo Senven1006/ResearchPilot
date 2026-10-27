@@ -1,0 +1,16 @@
+# 统一换行与二进制判定：避免 Git 把 PDF / 图片当文本做换行转换而损坏文件
+* text=auto eol=lf
+
+*.pdf binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+
+*.docx binary
+*.xlsx binary
+*.pptx binary
