@@ -254,3 +254,27 @@ def test_api_token_is_enforced_when_configured(client, monkeypatch):
         assert client.get("/health").status_code == 200
     finally:
         monkeypatch.setattr(main, "API_TOKEN", "")
+
+
+def test_cors_preflight_bypasses_token_guard(client, monkeypatch):
+    """浏览器预检不带自定义头，必须放行，否则开了 token 就跨域不可用。"""
+    monkeypatch.setattr(main, "API_TOKEN", "secret-token")
+
+    try:
+        preflight = client.options(
+            "/papers/status",
+            headers={
+                "Origin": "http://127.0.0.1:5173",
+                "Access-Control-Request-Method": "GET",
+                "Access-Control-Request-Headers": "x-api-token",
+            },
+        )
+        assert preflight.status_code == 200
+        assert preflight.headers["access-control-allow-origin"] == "http://127.0.0.1:5173"
+
+        # 真正带 Origin 的普通请求仍要 token
+        assert client.get(
+            "/papers/status", headers={"Origin": "http://127.0.0.1:5173"}
+        ).status_code == 401
+    finally:
+        monkeypatch.setattr(main, "API_TOKEN", "")

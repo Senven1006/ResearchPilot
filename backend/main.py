@@ -134,7 +134,7 @@ def extract_paper_identity(filename: str) -> dict:
 app = FastAPI(
     title="ResearchPilot",
     description="智能科研助手：持久化 RAG 与双模型路由",
-    version="0.4.0",
+    version="0.5.0",
 )
 
 # 允许前端从独立域名访问（生产环境把站点域名写进 ALLOW_ORIGINS）
@@ -150,7 +150,9 @@ app.add_middleware(
 @app.middleware("http")
 async def enforce_api_token(request, call_next):
     """设置 API_TOKEN 后，除公开路径外都要求 X-API-Token 请求头。"""
-    if API_TOKEN and request.url.path not in PUBLIC_PATHS:
+    # CORS 预检请求由浏览器自动发出，不可能携带自定义头，
+    # 因此放行 OPTIONS 交给 CORSMiddleware 处理
+    if API_TOKEN and request.method != "OPTIONS" and request.url.path not in PUBLIC_PATHS:
         # 图片 / SVG 等资源无法带自定义请求头，允许用 ?token= 传入
         provided = (
             request.headers.get("x-api-token")
