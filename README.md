@@ -178,7 +178,7 @@ npm run dev                     # 默认 http://127.0.0.1:5173
 ```bash
 cd ResearchPilot/backend
 pip install -r requirements-dev.txt      # 含 pytest
-python -m pytest                         # 14 个用例，约 3 秒
+python -m pytest                         # 15 个用例，约 3 秒
 ```
 
 覆盖范围：健康检查与降级后端、结构化解析（标题树 / 参考文献切分）、入库与原件留档、内容级去重、问答证据与断言核验（含刻意答错数字被标出）、划词翻译与缓存、分章节翻译的缓存命中、CSV 图表生成、非 CSV 拒绝、库内文献回填、越界引用检测、鉴权开关（无 token / 错 token / header / `?token=` 四种情况）。
@@ -220,7 +220,7 @@ API_TOKEN=<一段足够长的随机串>
 ALLOW_ORIGINS=http://127.0.0.1:5173
 ```
 
-- 校验用 `secrets.compare_digest` 做恒时比较，`/`、`/health`、`/docs`、`/redoc`、`/openapi.json` 始终放行，其余接口一律要 token。
+- 校验用 `secrets.compare_digest` 做恒时比较，`/`、`/health`、`/docs`、`/redoc`、`/openapi.json` 始终放行，其余接口一律要 token；`OPTIONS` 预检请求放行，否则开了 token 之后跨域请求会卡在预检阶段。
 - 前端把 `VITE_API_TOKEN` 写进 `frontend/.env`（模板见 [`frontend/.env.example`](frontend/.env.example)），`src/api.js` 会自动带上请求头；图片、SVG 图这类 `<img src>` 无法加头，因此走 `?token=`。
 - 注意：token 会进浏览器 bundle 和 URL，这是"单机/内网自用"级别的防护，不是多租户方案。真要对外提供服务，还需要 HTTPS 反向代理 + 账号体系。
 
