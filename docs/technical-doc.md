@@ -408,7 +408,7 @@ if request == "auto":                       return "deepseek" if key else ("loca
 - 前端通过 ESLint 全量检查：修复未使用变量、Hooks 依赖缺失、正则共享状态副作用等问题，达到 0 error / 0 warning。
 - **测试沉淀为可重复执行的套件**：手工回归只做过一次就没人再跑，因此把它固化成 `backend/tests/`（pytest 9.1.1，15 个用例）。约定是"每个后端能力至少有一条接口级用例，且用例必须离线可跑"——不联网、不要求 Ollama、不要求真实 Key，否则 CI 里必然被跳过。
 - **CI 守住回归线**：[`.github/workflows/ci.yml`](.github/workflows/ci.yml) 两个 job，后端跑 `pip install -r requirements-dev.txt` + `pytest`，前端跑 `npm ci` + `npm run lint` + `npm run build`，任何一步失败即红。
-- 提交历史按"依赖与环境 → 解析 → 去重 → 检索核验 → 翻译 → 写作 → 图表 → 接口 → 前端 → 安全与留档 → 测试与 CI → 文档"的依赖顺序组织，共 27 次提交。
+- 提交历史按"依赖与环境 → 解析 → 去重 → 检索核验 → 翻译 → 写作 → 图表 → 接口 → 前端 → 安全与留档 → 测试与 CI → 文档"的依赖顺序组织，每类改动单独成 Commit，便于回溯每一层能力的引入时间。
 
 ## 6.5 部署步骤
 
