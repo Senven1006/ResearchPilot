@@ -1,3 +1,4 @@
+import { apiFetch } from './api'
 
 import { useEffect, useRef, useState } from 'react'
 import {
@@ -179,7 +180,7 @@ export default function App() {
   
 async function loadHealth() {
   try {
-    const res = await fetch(`${API}/health`)
+    const res = await apiFetch(`${API}/health`)
     if (!res.ok) {
       throw new Error(`HTTP ${res.status}`)
     }
@@ -195,7 +196,7 @@ async function loadHealth() {
 
 async function loadLibrary() {
   try {
-    const res = await fetch(`${API}/papers/status`)
+    const res = await apiFetch(`${API}/papers/status`)
     if (!res.ok) return
     const data = await res.json()
     setLibraryFiles(data.indexed_files || [])
@@ -219,7 +220,7 @@ useEffect(() => {
     const exactForm = new FormData()
     exactForm.append('file', file)
 
-    const exactRes = await fetch(`${API}/papers/duplicates/check-file`, {
+    const exactRes = await apiFetch(`${API}/papers/duplicates/check-file`, {
       method: 'POST',
       body: exactForm,
     })
@@ -256,7 +257,7 @@ useEffect(() => {
       const semanticForm = new FormData()
       semanticForm.append('file', file)
 
-      const semanticRes = await fetch(
+      const semanticRes = await apiFetch(
         `${API}/papers/duplicates/semantic-check`,
         { method: 'POST', body: semanticForm }
       )
@@ -332,7 +333,7 @@ useEffect(() => {
       const form = new FormData()
       pdfFiles.forEach(file => form.append('files', file))
 
-      const res = await fetch(`${API}/papers/batch-index`, {
+      const res = await apiFetch(`${API}/papers/batch-index`, {
         method: 'POST',
         body: form,
       })
@@ -421,7 +422,7 @@ useEffect(() => {
         }
 
     try {
-      const res = await fetch(`${API}/papers/ask`, {
+      const res = await apiFetch(`${API}/papers/ask`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -482,7 +483,7 @@ useEffect(() => {
       const form = new FormData()
       form.append('file', target.file)
 
-      const res = await fetch(
+      const res = await apiFetch(
         `${API}/papers/structure?ocr=true&ocr_max_pages=20`,
         { method: 'POST', body: form }
       )

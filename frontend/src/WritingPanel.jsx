@@ -2,6 +2,7 @@ import { useState } from 'react'
 import {
   AlertTriangle, BookOpen, ChartLine, Languages, PenLine, X,
 } from 'lucide-react'
+import { apiFetch, withToken } from './api'
 
 const TABS = [
   { id: 'outline', label: '论文框架', icon: PenLine },
@@ -49,7 +50,7 @@ function OutlineTab() {
     setResult(null)
 
     try {
-      const res = await fetch('/api/writing/outline', {
+      const res = await apiFetch('/api/writing/outline', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ idea: text, top_k: 5 }),
@@ -170,7 +171,7 @@ function DatavizTab() {
     try {
       const form = new FormData()
       form.append('file', file)
-      const res = await fetch('/api/dataviz/report', { method: 'POST', body: form })
+      const res = await apiFetch('/api/dataviz/report', { method: 'POST', body: form })
       const payload = await res.json()
       if (!res.ok) throw new Error(payload.detail || '生成失败')
       setResult(payload)
@@ -247,7 +248,7 @@ function DatavizTab() {
             <Card key={chart.file}>
               <SectionTitle>{chart.title}</SectionTitle>
               <img
-                src={chart.chart_url}
+                src={withToken(chart.chart_url)}
                 alt={chart.title}
                 style={{ width: '100%', maxWidth: '760px', display: 'block', margin: '0 auto' }}
               />
@@ -287,7 +288,7 @@ function TranslateTab() {
     setTranslation('')
 
     try {
-      const res = await fetch('/api/writing/translate', {
+      const res = await apiFetch('/api/writing/translate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: source }),

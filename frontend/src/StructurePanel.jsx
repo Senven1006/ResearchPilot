@@ -3,6 +3,7 @@ import {
   AlertTriangle, BookOpen, ChevronRight, Download, FileText,
   Image as ImageIcon, Languages, ListTree, Sigma, Table, X,
 } from 'lucide-react'
+import { apiFetch, withToken } from './api'
 
 const API = '/api'
 
@@ -277,7 +278,7 @@ function FiguresView({ figures }) {
         <div key={figure.id} style={{ border: '1px solid #eceaf8', borderRadius: '12px', overflow: 'hidden' }}>
           {figure.url ? (
             <img
-              src={figure.url}
+              src={withToken(figure.url)}
               alt={figure.caption || figure.id}
               loading="lazy"
               style={{ width: '100%', display: 'block', background: '#faf9ff' }}
@@ -572,7 +573,7 @@ function TranslateCard({ text, position, onClose }) {
 
     async function run() {
       try {
-        const res = await fetch(`${API}/translate`, {
+        const res = await apiFetch(`${API}/translate`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ text }),
@@ -639,7 +640,7 @@ function TranslateCard({ text, position, onClose }) {
 
 /** 请求指定章节的段落译文；后端按「文档 + 模型」做磁盘缓存。 */
 async function requestTranslation(sha256, sectionIds, maxBlocks) {
-  const res = await fetch(
+  const res = await apiFetch(
     `${API}/papers/structure/${sha256}/translate`
     + `?model=auto&concurrency=4&max_blocks=${maxBlocks}`
     + `&sections=${sectionIds.join(',')}`,
