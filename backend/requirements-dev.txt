@@ -1,0 +1,3 @@
+# 开发/测试依赖（在 requirements.txt 之上加测试工具）
+-r requirements.txt
+pytest==9.1.1
