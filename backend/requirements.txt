@@ -1,7 +1,9 @@
-# ResearchPilot 后端依赖
-# 安装： backend/.venv/Scripts/python.exe -m pip install -r backend/requirements.txt
+# ResearchPilot backend dependencies
+# Install: backend/.venv/Scripts/python.exe -m pip install -r backend/requirements.txt
+# Keep this file pure ASCII: pip decodes requirement files with the system locale
+# (GBK on Chinese Windows) and aborts on UTF-8 comments with a UnicodeDecodeError.
 
-# Web 服务
+# Web service
 fastapi==0.143.0
 uvicorn==0.54.0
 python-multipart==0.0.32
@@ -9,14 +11,14 @@ python-dotenv==1.2.4
 httpx==0.28.1
 openai==3.31.0
 
-# 向量库与嵌入
+# Vector store and embeddings
 chromadb==1.5.9
 numpy==2.5.4
 
-# PDF 解析
+# PDF parsing
 pymupdf==1.28.2
 
-# 扫描件 OCR（onnxruntime 后端，无需安装 tesseract）
+# Scanned-PDF OCR (onnxruntime backend, no system tesseract needed)
 rapidocr-onnxruntime==1.4.4
 opencv-python==5.0.0.93
 pillow==13.0.0

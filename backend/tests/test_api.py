@@ -2,7 +2,26 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import main
+
+
+def test_requirement_files_stay_pure_ascii():
+    """pip 用系统 locale 解码 requirements 文件。
+
+    中文 Windows 的 locale 是 GBK，文件里出现 UTF-8 中文注释时，
+    `pip install -r requirements-dev.txt` 会直接 UnicodeDecodeError
+    （pip 24.2 实测只按 locale 解码，不做 UTF-8 回退），
+    所以这两个文件必须保持纯 ASCII。
+    """
+    backend = Path(__file__).resolve().parents[1]
+    offenders = [
+        name
+        for name in ("requirements.txt", "requirements-dev.txt")
+        if any(byte > 127 for byte in (backend / name).read_bytes())
+    ]
+    assert offenders == [], f"这些文件含非 ASCII 字符：{offenders}"
 
 
 def test_health_reports_hash_backend(client):

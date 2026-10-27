@@ -1,3 +1,5 @@
-# 开发/测试依赖（在 requirements.txt 之上加测试工具）
+# Development / test dependencies (extends requirements.txt)
+# Install: backend/.venv/Scripts/python.exe -m pip install -r backend/requirements-dev.txt
+# Keep this file pure ASCII (see the note in requirements.txt).
 -r requirements.txt
 pytest==9.1.1
