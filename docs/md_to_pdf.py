@@ -226,9 +226,11 @@ def parse_markdown(source: str) -> list[dict]:
             candidate = lines[index].strip()
             if (
                 not candidate
-                or candidate.startswith(("#", "```", "|", ">", "-", "*"))
+                or candidate.startswith(("#", "```", "|", ">"))
                 or candidate == PAGEBREAK
                 or candidate in {"---", "***"}
+                # 只有「- 」「* 」才是列表项；**加粗** 开头的普通段落不能被当成列表
+                or re.match(r"^[-*]\s", candidate)
                 or re.match(r"^\s*\d+\.\s", lines[index])
             ):
                 break
@@ -291,6 +293,25 @@ def to_segments(text: str, size: float, color, bold: bool = False,
         segments.append(Segment(buffer, buffer_font, size, color,
                                 bold=bold and buffer_font == FONT_LATIN_BOLD))
 
+    return segments
+
+
+def runs_to_segments(runs: list[tuple[str, str]], size: float, color,
+                     bold: bool = False) -> list[Segment]:
+    """把 parse_inline 的 (样式, 文本) 片段转成带样式的 Segment 列表。
+
+    t=普通、b=加粗、c=等宽代码；引文块也要走这一步，否则 ** 标记会原样印出来。
+    """
+    segments: list[Segment] = []
+    for style, value in runs:
+        if not value:
+            continue
+        if style == "b":
+            segments.extend(to_segments(value, size, color, bold=True))
+        elif style == "c":
+            segments.extend(to_segments(value, size, color, code=True))
+        else:
+            segments.extend(to_segments(value, size, color, bold=bold))
     return segments
 
 
@@ -531,8 +552,8 @@ class DocBuilder:
 
         self.y += 2
 
-    def add_quote(self, text: str):
-        segments = to_segments(text, BODY_SIZE, (0.28, 0.26, 0.36))
+    def add_quote(self, runs: list[tuple[str, str]]):
+        segments = runs_to_segments(runs, BODY_SIZE, (0.28, 0.26, 0.36))
         lines = self.wrap(segments, CONTENT_WIDTH - 26)
         height = LINE_HEIGHT * len(lines) + 10
 
@@ -882,7 +903,7 @@ def dispatch(builder: DocBuilder, block: dict, next_block: dict | None = None):
         )
         builder.add_list_item(text, 18, f"{block['number']}.")
     elif kind == "quote":
-        builder.add_quote(block["text"])
+        builder.add_quote(parse_inline(block["text"]))
     elif kind == "code":
         builder.add_code(block["lines"])
     elif kind == "table":
