@@ -169,6 +169,29 @@ npm run dev                     # 默认 http://127.0.0.1:5173
 3. 打开「结构化解析」→ 查看标题树 / 表格 / 图表 / 公式 / 参考文献。
 4. 点「中英对照」→ 当前章节先出译文，读完点「继续翻译」译下一节。
 5. 侧栏「写作辅助」→ 生成框架（参考文献来自库内论文）、上传 CSV 出图表与图注。
+6. 点原文下载按钮 → 从 `data/papers/` 取回入库时留档的原始 PDF（见 §6 的 `/papers/file/{sha256}`）。
+
+### 4.5 本地测试与 CI
+
+后端测试是完全离线的：不需要网络、不需要 Ollama、不需要真实 DeepSeek Key。
+
+```bash
+cd ResearchPilot/backend
+pip install -r requirements-dev.txt      # 含 pytest
+python -m pytest                         # 14 个用例，约 3 秒
+```
+
+覆盖范围：健康检查与降级后端、结构化解析（标题树 / 参考文献切分）、入库与原件留档、内容级去重、问答证据与断言核验（含刻意答错数字被标出）、划词翻译与缓存、分章节翻译的缓存命中、CSV 图表生成、非 CSV 拒绝、库内文献回填、越界引用检测、鉴权开关（无 token / 错 token / header / `?token=` 四种情况）。
+
+前端检查：
+
+```bash
+cd ResearchPilot/frontend
+npm run lint                             # ESLint 0 error 0 warning
+npm run build
+```
+
+推送或提 PR 时 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) 会自动跑后端 pytest + 前端 lint/build 两条流水线。
 
 ---
 
@@ -182,9 +205,28 @@ npm run dev                     # 默认 http://127.0.0.1:5173
 | `OLLAMA_BASE_URL` | 否 | `http://127.0.0.1:11434` | 本地模型服务地址；连不上会自动降级 |
 | `LOCAL_CHAT_MODEL` | 否 | `qwen2.5:7b` | 本地对话模型（未下载时自动改用在线模型） |
 | `EMBED_MODEL` | 否 | `nomic-embed-text:latest` | 本地嵌入模型（不可用时自动改用离线哈希嵌入） |
-| `CHROMA_PATH` | 否 | `D:/ResearchPilot/data/chroma` | 向量库路径；同级自动创建 `parsed/` `figures/` `translated/` `charts/` |
+| `CHROMA_PATH` | 否 | `D:/ResearchPilot/data/chroma` | 向量库路径；同级自动创建 `parsed/` `figures/` `translated/` `charts/` `papers/` |
+| `API_TOKEN` | 否 | 空 | 留空 = 不校验（本地开发默认）；填了就要求所有接口带 `X-API-Token` 头或 `?token=` 参数 |
+| `ALLOW_ORIGINS` | 否 | `http://127.0.0.1:5173,http://localhost:5173` | CORS 白名单，逗号分隔；填 `*` 放开所有来源 |
 
 两种嵌入后端的数据互不混写：Ollama 模式用 `research_papers` / `paper_units`，降级模式用 `research_papers_hash` / `paper_units_hash`，因此切换后端不会损坏已有索引。当前状态可通过 `GET /health` 的 `embedding`、`local_chat_available`、`fallback_mode` 字段查看（前端模型卡片也会实时显示）。
+
+### 5.1 鉴权与跨域（可选加固）
+
+默认是本机单人使用，所以鉴权是**关着的**：不填 `API_TOKEN` 时行为与本机开发完全一致。把服务暴露到局域网或公网之前，请至少做两件事：
+
+```ini
+API_TOKEN=<一段足够长的随机串>
+ALLOW_ORIGINS=http://127.0.0.1:5173
+```
+
+- 校验用 `secrets.compare_digest` 做恒时比较，`/`、`/health`、`/docs`、`/redoc`、`/openapi.json` 始终放行，其余接口一律要 token。
+- 前端把 `VITE_API_TOKEN` 写进 `frontend/.env`（模板见 [`frontend/.env.example`](frontend/.env.example)），`src/api.js` 会自动带上请求头；图片、SVG 图这类 `<img src>` 无法加头，因此走 `?token=`。
+- 注意：token 会进浏览器 bundle 和 URL，这是"单机/内网自用"级别的防护，不是多租户方案。真要对外提供服务，还需要 HTTPS 反向代理 + 账号体系。
+
+### 5.2 原件留档
+
+入库时除了切分单元和向量，还会把原始 PDF 存一份到 `data/papers/<sha256>.pdf`（该目录已在 `.gitignore` 里）。`GET /papers/status` 的 `files[]` 会给出 `downloadable` 与 `file_url`，前端据此决定是否显示下载按钮。留档失败不影响入库（返回 `archived: false`），只是哈希校验这一环弱一些。
 
 完整模板见 [`backend/.env.example`](backend/.env.example)。`backend/.env` 已被 `.gitignore` 忽略，**请勿提交真实密钥**。
 
@@ -194,8 +236,9 @@ npm run dev                     # 默认 http://127.0.0.1:5173
 
 | 分组 | 方法与路径 | 用途 |
 |---|---|---|
-| 基础 | `GET /health`、`GET /papers/status` | 健康检查、库内文件与单元统计 |
-| 索引 | `POST /papers/index`、`POST /papers/batch-index` | 单篇 / 批量入库（`structure=true` 同步建结构化单元） |
+| 基础 | `GET /health`、`GET /papers/status` | 健康检查、库内文件与单元统计（含原件可下载标记） |
+| 索引 | `POST /papers/index`、`POST /papers/batch-index` | 单篇 / 批量入库（`structure=true` 同步建结构化单元，同时留档原件） |
+| 原件 | `GET /papers/file/{sha256}` | 取回入库时留档的原始 PDF（sha256 为 64 位十六进制，缺失返回 404） |
 | 去重 | `POST /papers/duplicates/check-file`、`GET /papers/duplicates/check`、`POST /papers/duplicates/semantic-check` | 字节去重、arXiv 版本、正文语义比对 |
 | 解析 | `POST /papers/parse`、`POST /papers/structure`、`GET /papers/structure/{id}`、`GET /papers/structure/{id}/figures/{name}` | 文本抽取、结构化解析、结果缓存、图表图片 |
 | 问答 | `POST /papers/ask` | `mode=single\|compare`，返回证据、断言核验、覆盖率 |
@@ -215,6 +258,8 @@ npm run dev                     # 默认 http://127.0.0.1:5173
 6. 拓扑图脚本只做静态语法校验，本机不执行 LaTeX / Graphviz / Matplotlib 渲染。
 7. **降级模式的检索质量**：离线哈希嵌入是词袋级别的替代方案，比 `nomic-embed-text` 弱（同义改写、跨语言提问的召回会变差），但索引、检索、去重、核验流程完全可用。启动 Ollama 后重新索引即可切回语义嵌入（旧数据保留在 `*_hash` 集合中，互不影响）。
 8. 降级模式下 `research_papers` 与 `research_papers_hash` 是两套索引：切换到 Ollama 后需要**重新索引**才能在语义空间下检索。
+9. **长文档解析是同步请求**：几百页的 PDF 解析期间 HTTP 连接会一直占着（120 页约 11 秒，尚可接受；更长的文档体验会变差）。后台任务队列 + 进度轮询 + 取消还没做，属于下一步工作。
+10. 原件留档会额外占用磁盘（一份 PDF 存一份），目前没有自动清理策略，需要手动清 `data/papers/`。
 
 ---
 

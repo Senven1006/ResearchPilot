@@ -37,7 +37,7 @@ CONTENT_WIDTH = PAGE_WIDTH - MARGIN_LEFT - MARGIN_RIGHT
 BODY_SIZE = 10.5
 LINE_HEIGHT = 17.4
 TITLE = "ResearchPilot 技术文档"
-VERSION = "v0.4.0 · 2026-10"
+VERSION = "v0.5.0 · 2026-10"
 
 # 字体：中文宋体 + 西文 Helvetica + 等宽 Courier
 FONT_CJK = "china-s"
@@ -99,6 +99,33 @@ def plain(text: str) -> str:
     return re.sub(r"`([^`]+)`", r"\1", text)
 
 
+def split_table_cells(raw: str) -> list[str]:
+    """Split one Markdown table row on unescaped pipes, honouring `\\|`."""
+    text = raw.strip()
+    if text.startswith("|"):
+        text = text[1:]
+    if text.endswith("|") and not text.endswith("\\|"):
+        text = text[:-1]
+    cells: list[str] = []
+    buffer: list[str] = []
+    index = 0
+    while index < len(text):
+        char = text[index]
+        if char == "\\" and index + 1 < len(text) and text[index + 1] in "|\\":
+            buffer.append(text[index + 1])
+            index += 2
+            continue
+        if char == "|":
+            cells.append("".join(buffer).strip())
+            buffer = []
+            index += 1
+            continue
+        buffer.append(char)
+        index += 1
+    cells.append("".join(buffer).strip())
+    return cells
+
+
 def parse_markdown(source: str) -> list[dict]:
     blocks: list[dict] = []
     lines = source.replace("\r\n", "\n").split("\n")
@@ -147,7 +174,7 @@ def parse_markdown(source: str) -> list[dict]:
             while index < len(lines) and lines[index].strip().startswith("|"):
                 raw = lines[index].strip()
                 if not re.fullmatch(r"[-:\s|]+", raw):
-                    rows.append([cell.strip() for cell in raw.strip("|").split("|")])
+                    rows.append(split_table_cells(raw))
                 index += 1
             if rows:
                 blocks.append({
@@ -575,7 +602,14 @@ class DocBuilder:
             desired.append(max(measure(value) for value in values) + padding * 2)
 
         # 第一列（通常是名称/关键词）给固定比例，其余按内容比例分配，
-        # 避免"按内容归一化"把短列（中文列名）压得过窄而频繁折行
+        # 避免"按内容归一化"把短列（中文列名）压得过窄而频繁折行。
+        # 单列内容会无限制地撑大 desired（例如一行里塞了四个长路径），
+        # 因此先按上限截断，防止它把"说明"列压到只剩几十点宽。
+        if columns >= 3:
+            desired = desired[:1] + [
+                min(value, CONTENT_WIDTH * 0.32) for value in desired[1:]
+            ]
+
         if columns == 1:
             widths = [CONTENT_WIDTH]
         else:
@@ -869,7 +903,7 @@ def build(source_path: Path, pdf_path: Path, subtitle: str,
 def main():
     root = Path(__file__).resolve().parent
     source = root / "technical-doc.md"
-    target = root / "ResearchPilot-技术文档.pdf"
+    target = root / "ResearchPilot-technical-doc.pdf"
 
     if not source.exists():
         raise SystemExit(f"缺少内容源文件：{source}")
@@ -877,7 +911,7 @@ def main():
     meta = [
         ("项目名称", "ResearchPilot 面向科研阅读与写作的本地优先 AI 助手"),
         ("文档类型", "技术文档（项目交付）"),
-        ("版本", "v0.4.0"),
+        ("版本", "v0.5.0"),
         ("代码仓库", "https://github.com/Senven1006/ResearchPilot"),
         ("技术栈", "FastAPI · ChromaDB · PyMuPDF · RapidOCR · React 19 · Vite"),
     ]

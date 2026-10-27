@@ -26,9 +26,10 @@ ResearchPilot 的定位是：**把一篇（或一批）PDF 变成可检索、可
 
 | 交付物 | 内容 |
 |---|---|
-| 后端服务 | FastAPI 应用，8 个 Python 模块、5229 行代码、25 个 HTTP 接口 |
-| 前端应用 | React 19 + Vite 单页应用，3 个界面（问答 / 结构化阅读 / 写作 Copilot），2871 行代码 |
-| 数据层 | ChromaDB 持久化向量库 + 本地文件缓存（解析结果、图表裁图、译文、图表 SVG） |
+| 后端服务 | FastAPI 应用，8 个 Python 模块、5388 行代码（非空行）、26 个 HTTP 接口 |
+| 前端应用 | React 19 + Vite 单页应用，3 个界面（问答 / 结构化阅读 / 写作 Copilot），2914 行代码 |
+| 数据层 | ChromaDB 持久化向量库 + 本地文件缓存（原件留档、解析结果、图表裁图、译文、图表 SVG） |
+| 质量保障 | 离线 pytest 套件（14 个接口级用例）+ GitHub Actions 双流水线（后端测试 / 前端构建与静态检查） |
 | 工程文档 | README、环境变量模板、依赖清单、本技术文档 |
 
 ## 1.4 关键设计取舍
@@ -100,8 +101,8 @@ ResearchPilot 的定位是：**把一篇（或一批）PDF 变成可检索、可
 +-------------------------------+-----------------------------------+
                                 | /api reverse proxy -> 127.0.0.1:8000
 +-------------------------------v-----------------------------------+
-| API layer: FastAPI (main.py, 25 routes)                           |
-| validation / error mapping / uniform response / path safety       |
+| API layer: FastAPI (main.py, 26 routes)                           |
+| token guard / CORS allowlist / validation / error mapping / paths |
 +------+----------+----------+----------+----------+---------------+
        |          |          |          |          |
 +------v-----+ +--v-------+ +v--------+ +v--------+ +v---------+
@@ -168,18 +169,20 @@ question -> hard terms (numbers / model ids / greek letters) + intent (table/for
 | `paper_units` | 结构化检索单元 | unit_id、anchor_type、anchor_label、section、section_level、page、ref、year、title |
 | `*_hash` | 降级模式的两套同名集合 | 同上，维度 384（Ollama 为 768） |
 | `data/parsed/*.json` | 完整解析结果（含 Markdown 版本） | meta、outline、sections、tables、figures、equations、references、appendix、stats、limitations |
+| `data/papers/<sha256>.pdf` | 入库时的原件留档，供 `GET /papers/file/{sha256}` 取回 | 以内容哈希命名，天然去重；缺失不影响索引 |
 | `data/figures/<sha>/` | 图表裁图 PNG | 按页与序号命名 |
 | `data/translated/<sha>.<model>.json` | 段落级译文缓存 | 段落哈希 → 译文 |
 | `data/charts/<stem>/` | 可视化 SVG | 折线/柱状/雷达 |
 
 集合按嵌入后端隔离（`_hash` 后缀）是关键决策：不同后端的向量维度与语义空间都不兼容，混写会让检索彻底失真，而隔离后切换后端不需要重建另一侧的索引。
 
-## 3.5 接口清单（25 个）
+## 3.5 接口清单（26 个）
 
 | 分组 | 路径 | 说明 |
 |---|---|---|
-| 基础 | `GET /`、`GET /health`、`GET /papers/status` | 健康检查、嵌入后端与库统计 |
-| 索引 | `POST /papers/index`、`POST /papers/batch-index` | 单篇 / 批量入库，`structure=true` 同步建单元 |
+| 基础 | `GET /`、`GET /health`、`GET /papers/status` | 健康检查、嵌入后端与库统计，并标记原件可下载 |
+| 索引 | `POST /papers/index`、`POST /papers/batch-index` | 单篇 / 批量入库，`structure=true` 同步建单元并留档原件 |
+| 原件 | `GET /papers/file/{sha256}` | 取回留档 PDF；sha256 需为 64 位十六进制，缺失返回 404 |
 | 解析 | `POST /papers/parse`、`POST /papers/structure`、`GET /papers/structure/{id}`、`GET /papers/structure/{id}/figures/{name}` | 文本抽取、结构化解析、结果缓存、裁图 |
 | 去重 | `POST /papers/duplicates/check-file`、`GET /papers/duplicates/check`、`POST /papers/duplicates/semantic-check` | 字节去重、版本识别、正文语义比对 |
 | 问答 | `POST /papers/ask` | `mode=single\|compare`，返回证据/核验/覆盖率 |
@@ -190,6 +193,13 @@ question -> hard terms (numbers / model ids / greek letters) + intent (table/for
 ## 3.6 部署拓扑
 
 单机部署，三个进程：后端 `uvicorn main:app --port 8000`、前端 `vite`（开发 5173 / 生产静态托管）、Ollama `11434`（可选）。前端通过 `/api` 前缀代理到后端，避免跨域配置；数据全部落在仓库同级的 `data/` 目录，可直接打包迁移。
+
+对外暴露时有两道可选加固，默认关闭以保持本机开发零配置：
+
+- **令牌守卫**：一个 HTTP 中间件拦截除 `/`、`/health`、`/docs`、`/redoc`、`/openapi.json` 之外的请求，要求 `X-API-Token` 头或 `?token=` 参数，用 `secrets.compare_digest` 恒时比较。前端在 `src/api.js` 里统一注入请求头，`<img src>` 类请求（裁图、SVG 图表）走查询参数。
+- **CORS 白名单**：`ALLOW_ORIGINS` 逗号分隔，默认只放行 5173。
+
+这两项解决的是"本机/内网自用"场景，不构成多租户隔离——token 会进入浏览器 bundle 与 URL，公网部署仍需 HTTPS 反代与账号体系。
 
 ---
 
@@ -355,6 +365,7 @@ if request == "auto":                       return "deepseek" if key else ("loca
 ## 6.2 测试方法
 
 - **真实语料回归**：用 v1/v7 两版论文覆盖解析、去重、检索、翻译、对比全链路。
+- **离线自动化回归**：`backend/tests/` 的 14 个接口级用例，用 `CHROMA_PATH` 指向临时目录、`OLLAMA_BASE_URL` 指向关闭端口强制走降级嵌入、`DEEPSEEK_API_KEY` 清空且用桩函数替换 `generate_answer`/`resolve_model`，因此不联网、不依赖 Ollama 与真实 Key；PDF 语料由 PyMuPDF 现场合成（标题页、三级标题、含"8 NVIDIA P100 GPUs"的表格、参考文献条目）。
 - **降级验证**：把 `OLLAMA_BASE_URL` 指向关闭端口模拟"未启动 Ollama"；另用本地 mock 服务（实现 `/api/tags`、`/api/embed`、`/api/chat`）验证 Ollama 可用分支，避免依赖真实服务。
 - **对抗验证**：人为构造含错误数字的答案，检查核验是否判为"未支持"；构造未授权引用编号，检查是否被检出。
 - **边界验证**：615 页文档应被拒绝；空库生成框架应拒绝；损坏 PDF 应返回 400。
@@ -385,12 +396,19 @@ if request == "auto":                       return "deepseek" if key else ("loca
 | 可视化 | 10 行 × 5 列 CSV | 折线/雷达生成，图注含 -73.0% 与最陡区间 |
 | 可视化 | 3 类 × 数值 CSV | 柱状图生成，图注含最高/最低与极差占比 |
 | 前端 | 构建与静态检查 | `vite build` 339ms 通过；ESLint 0 error / 0 warning |
+| 自动化 | `python -m pytest`（14 用例） | 14 passed，3.1s，全程离线 |
+| 自动化 | 原件留档 | 入库后 `/papers/status` 标记 `downloadable=true`，取回内容以 `%PDF-` 开头 |
+| 自动化 | 断言核验（对抗） | 正确数字判"支持"，伪造数字被标出，降级模式降为 `unverified` |
+| 自动化 | 鉴权开关 | 无 token / 错 token → 401；header 与 `?token=` 均 → 200；公开路径始终 200 |
+| 自动化 | CI | GitHub Actions 后端 pytest + 前端 lint/build 双流水线通过 |
 
 ## 6.4 代码质量与工程规范
 
 - 后端 8 个模块均通过 AST 解析与导入检查；移除死代码（未调用的相似度函数、废弃的打分函数）与调试输出。
 - 前端通过 ESLint 全量检查：修复未使用变量、Hooks 依赖缺失、正则共享状态副作用等问题，达到 0 error / 0 warning。
-- 提交历史按"依赖与环境 → 解析 → 去重 → 检索核验 → 翻译 → 写作 → 图表 → 接口 → 前端 → 文档"的依赖顺序组织，共 14 次提交。
+- **测试沉淀为可重复执行的套件**：手工回归只做过一次就没人再跑，因此把它固化成 `backend/tests/`（pytest 9.1.1，14 个用例）。约定是"每个后端能力至少有一条接口级用例，且用例必须离线可跑"——不联网、不要求 Ollama、不要求真实 Key，否则 CI 里必然被跳过。
+- **CI 守住回归线**：[`.github/workflows/ci.yml`](.github/workflows/ci.yml) 两个 job，后端跑 `pip install -r requirements-dev.txt` + `pytest`，前端跑 `npm ci` + `npm run lint` + `npm run build`，任何一步失败即红。
+- 提交历史按"依赖与环境 → 解析 → 去重 → 检索核验 → 翻译 → 写作 → 图表 → 接口 → 前端 → 安全与留档 → 测试与 CI → 文档"的依赖顺序组织，共 27 次提交。
 
 ## 6.5 部署步骤
 
@@ -406,7 +424,13 @@ uvicorn main:app --port 8000
 cd ../frontend
 npm install
 npm run dev                   # http://127.0.0.1:5173
+
+# 3) 提交前自检（可选，CI 会做同样的事）
+cd ../backend && pip install -r requirements-dev.txt && python -m pytest
+cd ../frontend && npm run lint && npm run build
 ```
+
+对外暴露前在 `backend/.env` 里设 `API_TOKEN`（并在 `frontend/.env` 里填同一个值到 `VITE_API_TOKEN`）、把 `ALLOW_ORIGINS` 收紧到实际前端地址。
 
 生产部署建议：前端 `npm run build` 后由 Nginx 托管静态文件并把 `/api` 反代到 8000；后端用 `uvicorn --workers 2` 或 systemd 托管；`data/` 目录单独挂载并定期备份。
 
@@ -420,6 +444,8 @@ npm run dev                   # http://127.0.0.1:5173
 | 翻译吞吐 | 受模型输出速度限制，全量翻译需数分钟 | 已用章节渐进缓解 |
 | 拓扑图脚本 | 只做静态校验，不执行渲染 | 需用户在本地/在线渲染 |
 | 页数上限 | 单文档 600 页 | 超长篇书籍需拆分 |
+| 长文解析同步阻塞 | 解析在请求内完成，无进度与取消 | 120 页约 11s，更长文档体验下降 |
+| 鉴权强度 | 单令牌 + CORS 白名单，token 会进 bundle 与 URL | 适合单机/内网自用，非多租户方案 |
 
 ---
 
@@ -442,13 +468,36 @@ npm run dev                   # http://127.0.0.1:5173
 4. **对比模式的双侧证据保障**：通过每篇保底配额与"仅一侧有据"标注，把跨文献对比从"模型自由发挥"约束为"有据可比、无据明说"。
 5. **面向评审与教学的可解释性**：界面同时展示证据锚点、核验结论、解析限制与当前模型后端，使用者能一眼判断"这条结论是怎么来的、可信到什么程度"。
 
+## 7.3 工程实践创新点
+
+1. **离线可测的 AI 系统**：多数 RAG 项目"只能在有模型、有网络时验证"，本项目的测试套件通过"关端口强制降级 + 桩函数替换模型调用 + 现场合成 PDF"三件事，把整条 AI 链路变成可在 CI 里 3 秒跑完的确定性用例。
+2. **降级路径本身被测试覆盖**：降级不是兜底文档里的一句话，而是有用例断言的具体行为（后端标识 `hash`、集合带 `_hash` 后缀、核验模式自动切换、`grounding.score` 置空）。
+3. **原件留档与内容哈希对齐**：以 `sha256(内容)` 同时作为去重键、留档文件名与下载路由参数，三处共用同一标识，避免"索引说 A、文件是 B"的漂移。
+4. **安全开关零成本**：鉴权与 CORS 走环境变量，未配置时行为与本机开发完全一致，配置后即刻生效，不需要改代码分支。
+5. **失败可见而非静默兜底**：降级、留档失败、单元清理失败、译文命中缓存这类"没出事但状态变了"的情况一律在响应里给出布尔值或计数，界面据此显示，而不是悄悄替换结果。
+
+## 7.4 创新点与需求、证据的对应关系
+
+评审最常问"这条创新有没有落到可验证的地方"，对应关系如下表，证据位置均可在本文章节与代码中查证。
+
+| 创新点 | 对应痛点 | 文中证据 | 验证方式 |
+|---|---|---|---|
+| 结构化锚点检索 | 证据回不到原文位置 | 3.4 存储设计、4.3 检索优化策略 | 证据卡片带页码与章节，越界引用被检出 |
+| 断言级抗幻觉核验 | 回答敢不敢相信 | 4.4 生成与核验优化 | 伪造数字被判"未支持"，三态结论可复现 |
+| 无 Ollama 自动降级 | 无 GPU / 无本地模型的可用性 | 4.2 集成方式、6.3 测试结果 | 关端口后仍能索引与作答，后端标识为 `hash` |
+| 章节渐进翻译 | 长文档阅读节奏与等待时长 | 5.6 翻译与中英对照 | 首次 37 次调用、二次 0 次（缓存命中） |
+| 原件留档与令牌守卫 | 交付级可用性与安全边界 | 3.4、3.6、6.3 | `downloadable` 标记、401/200 四种鉴权用例 |
+| 离线可测的 AI 链路 | 回归只能人工跑一次 | 6.2、6.3、6.4 | 14 个用例 3.1s 全程离线通过，CI 双流水线 |
+
+上表只列可以复现的部分。扫描件的表格结构还原、公式的像素级重建、拓扑图的真实渲染都没有做到，已在 6.6 逐一列为已知限制，不计入创新点。
+
 ---
 
 # 8. 总结与展望
 
 ## 8.1 总结
 
-ResearchPilot 已完成从 PDF 到可核对知识的完整链路：结构化解析解决"看得懂结构"，锚点检索解决"找得到证据"，断言核验解决"敢不敢相信"，翻译与双栏对照解决"读得下去"，写作 Copilot 与数据可视化解决"用得上"。工程上以 5229 行后端与 2871 行前端实现 25 个接口与 3 个界面，在无 GPU、无本地模型的环境下仍可完整运行，并在真实论文上完成了端到端回归。
+ResearchPilot 已完成从 PDF 到可核对知识的完整链路：结构化解析解决"看得懂结构"，锚点检索解决"找得到证据"，断言核验解决"敢不敢相信"，翻译与双栏对照解决"读得下去"，写作 Copilot 与数据可视化解决"用得上"。工程上以 5388 行后端与 2914 行前端实现 26 个接口与 3 个界面，在无 GPU、无本地模型的环境下仍可完整运行，并在真实论文上完成了端到端回归；同时以 14 个离线接口用例 + CI 双流水线把回归固化为可重复执行的流程。
 
 过程中也暴露出若干真实问题并已修复：文末参考文献被并入最后一节、同页多章节的后续节为空、降级模式下核验误判、翻译等待过长、图表页无法滚动等。这些问题构成了后续版本的回归用例。
 
@@ -460,6 +509,7 @@ ResearchPilot 已完成从 PDF 到可核对知识的完整链路：结构化解�
 | 公式精度 | 接入公式识别模型（如 pix2tex）替换当前启发式重建 |
 | 增量索引 | 支持按页/按章节增量更新，避免整篇重索引 |
 | 评测体系 | 构建带金标答案的问答评测集，量化检索召回与核验准确率 |
+| 长任务治理 | 把解析与整篇翻译改为后台任务队列，提供进度轮询、断点续跑与取消 |
 | 多语言 | 扩展嵌入与翻译到日/德/法等语种 |
 | 协作与导出 | 支持团队共享知识库、导出带锚点的阅读笔记与综述草稿 |
 
