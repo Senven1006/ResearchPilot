@@ -20,6 +20,7 @@ data/parsed/
 data/figures/
 data/translated/
 data/charts/
+data/papers/
 uploads/
 *.log
 

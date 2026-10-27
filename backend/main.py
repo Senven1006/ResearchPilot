@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import re
+import secrets
 from pathlib import Path
 
 import chromadb
@@ -11,7 +12,8 @@ import fitz
 import httpx
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, JSONResponse
 from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
 
@@ -76,10 +78,23 @@ PARSED_DIR = DATA_DIR / "parsed"
 FIGURES_DIR = DATA_DIR / "figures"
 TRANSLATIONS_DIR = DATA_DIR / "translated"
 CHARTS_DIR = DATA_DIR / "charts"
+PAPERS_DIR = DATA_DIR / "papers"
 MAX_OCR_PAGES = 20
 UNIT_COLLECTION_NAME = "paper_units"
 EVIDENCE_MAX_CHARS = 1400
 COMPARE_MIN_PER_PAPER = 2
+
+# 访问控制：留空表示不校验（本地单人使用）；公网部署时务必设置
+API_TOKEN = os.getenv("API_TOKEN", "").strip()
+ALLOW_ORIGINS = [
+    item.strip()
+    for item in os.getenv(
+        "ALLOW_ORIGINS",
+        "http://127.0.0.1:5173,http://localhost:5173",
+    ).split(",")
+    if item.strip()
+]
+PUBLIC_PATHS = {"/", "/health", "/docs", "/redoc", "/openapi.json"}
 
 MAX_FILE_SIZE = 30 * 1024 * 1024
 MAX_PAGES = 600
@@ -121,6 +136,33 @@ app = FastAPI(
     description="智能科研助手：持久化 RAG 与双模型路由",
     version="0.4.0",
 )
+
+# 允许前端从独立域名访问（生产环境把站点域名写进 ALLOW_ORIGINS）
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOW_ORIGINS or ["*"],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["*"],
+)
+
+
+@app.middleware("http")
+async def enforce_api_token(request, call_next):
+    """设置 API_TOKEN 后，除公开路径外都要求 X-API-Token 请求头。"""
+    if API_TOKEN and request.url.path not in PUBLIC_PATHS:
+        # 图片 / SVG 等资源无法带自定义请求头，允许用 ?token= 传入
+        provided = (
+            request.headers.get("x-api-token")
+            or request.query_params.get("token")
+            or ""
+        )
+        if not secrets.compare_digest(provided, API_TOKEN):
+            return JSONResponse(
+                {"detail": "缺少或无效的 API Token（请求头 X-API-Token）。"},
+                status_code=401,
+            )
+    return await call_next(request)
 
 # Chroma 将向量和元数据保存到磁盘，重启后自动加载
 Path(CHROMA_PATH).mkdir(parents=True, exist_ok=True)
@@ -803,6 +845,18 @@ async def index_structure_units(
     return {"units": len(units), "structured": structured, **info, "title": title}
 
 
+def archive_paper(content: bytes, file_sha256: str) -> bool:
+    """把原始 PDF 留存到 data/papers/<sha>.pdf，便于重新解析与审计。"""
+    try:
+        PAPERS_DIR.mkdir(parents=True, exist_ok=True)
+        path = PAPERS_DIR / f"{file_sha256}.pdf"
+        if not path.exists():
+            path.write_bytes(content)
+        return path.exists()
+    except Exception:  # noqa: BLE001
+        return False
+
+
 async def index_one_pdf(
     content: bytes, filename: str, with_units: bool = True
 ) -> dict:
@@ -815,6 +869,8 @@ async def index_one_pdf(
             status_code=422,
             detail="未提取到可检索文字；扫描版 PDF 需要 OCR。",
         )
+
+    archived = archive_paper(content, file_sha256)
 
     chunks_indexed = await embed_and_store_chunks(
         chunks, filename, file_sha256
@@ -840,8 +896,36 @@ async def index_one_pdf(
         "page_count": page_count,
         "chunks_indexed": chunks_indexed,
         "units_indexed": unit_info.get("units", 0),
+        "archived": archived,
         "structure": structure_summary,
     }
+
+
+@app.get("/papers/file/{file_sha256}")
+async def download_paper(file_sha256: str):
+    """下载留存的原始 PDF（data/papers/<sha>.pdf）。"""
+    if not re.fullmatch(r"[a-f0-9]{64}", file_sha256):
+        raise HTTPException(status_code=400, detail="非法的文件 ID。")
+
+    path = PAPERS_DIR / f"{file_sha256}.pdf"
+    if not path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="原始文件未留存（可能是开启留档功能之前入库的论文）。",
+        )
+
+    filename = f"{file_sha256[:12]}.pdf"
+    records = chunk_store().get(
+        where={"file_sha256": file_sha256},
+        include=["metadatas"],
+        limit=1,
+    )
+    for metadata in records.get("metadatas") or []:
+        if metadata and metadata.get("filename"):
+            filename = str(metadata["filename"])
+            break
+
+    return FileResponse(path, media_type="application/pdf", filename=filename)
 
 
 @app.post("/papers/index")
@@ -1641,6 +1725,7 @@ async def papers_status():
             "indexed_chunks": 0,
             "indexed_units": 0,
             "indexed_files": [],
+            "files": [],
             "embedding_backend": state["backend"],
         }
 
@@ -1648,10 +1733,31 @@ async def papers_status():
     filenames = sorted({
         item["filename"] for item in records["metadatas"] if item
     })
+
+    sha_by_name: dict[str, str] = {}
+    for metadata in records.get("metadatas") or []:
+        if not metadata:
+            continue
+        name = metadata.get("filename")
+        sha = metadata.get("file_sha256")
+        if name and sha and name not in sha_by_name:
+            sha_by_name[name] = sha
+
+    files = [
+        {
+            "filename": name,
+            "sha256": sha,
+            "downloadable": (PAPERS_DIR / f"{sha}.pdf").exists(),
+            "file_url": f"/api/papers/file/{sha}",
+        }
+        for name, sha in sorted(sha_by_name.items())
+    ]
+
     return {
         "indexed_chunks": total,
         "indexed_units": units,
         "indexed_files": filenames,
+        "files": files,
         "embedding_backend": state["backend"],
     }
 
