@@ -14,7 +14,7 @@
 
 | 模块 | 能力 |
 |---|---|
-| PDF 文件管理 | 单篇 / 批量上传、内容哈希去重、arXiv 版本识别、正文级语义去重与保留建议 |
+| PDF 文件管理 | 单篇 / 批量上传、内容哈希去重、arXiv 版本识别、正文级语义去重与保留建议；同一次批量里选到多版本会先提示 |
 | 结构化解析 | 标题 / 作者 / 机构 / 摘要、一至三级标题树、表格、图表（裁图）、公式（近似 LaTeX）、参考文献、附录；扫描件自动 OCR |
 | 抗幻觉问答 | 结构化锚点检索、混合检索（向量 + BM25 + 数字命中）、逐句断言核验（已核验 / 弱支持 / 未支持）、证据不足自动弃答 |
 | 跨文献推理 | 多篇对比模式，按论文配额保证双侧有据，输出「维度 × 论文」对照表并标注「仅一侧有据」 |
@@ -188,10 +188,11 @@ python -m pytest                         # 15 个用例，约 3 秒
 ```bash
 cd ResearchPilot/frontend
 npm run lint                             # ESLint 0 error 0 warning
+npm run test:precheck                    # 批次内查重 9 个断言（无需浏览器/网络）
 npm run build
 ```
 
-推送或提 PR 时 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) 会自动跑后端 pytest + 前端 lint/build 两条流水线。
+推送或提 PR 时 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) 会自动跑后端 pytest + 前端 lint / 查重回归 / build 三段流水线。
 
 ---
 
