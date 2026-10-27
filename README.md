@@ -178,7 +178,7 @@ npm run dev                     # 默认 http://localhost:5173
 ```bash
 cd ResearchPilot/backend
 pip install -r requirements-dev.txt      # 含 pytest
-python -m pytest                         # 15 个用例，约 3 秒
+python -m pytest                         # 16 个用例，约 3 秒
 ```
 
 覆盖范围：健康检查与降级后端、结构化解析（标题树 / 参考文献切分）、入库与原件留档、内容级去重、问答证据与断言核验（含刻意答错数字被标出）、划词翻译与缓存、分章节翻译的缓存命中、CSV 图表生成、非 CSV 拒绝、库内文献回填、越界引用检测、鉴权开关（无 token / 错 token / header / `?token=` 四种情况）。
