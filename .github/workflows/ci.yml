@@ -46,6 +46,10 @@ jobs:
         working-directory: frontend
         run: npm run lint
 
+      - name: Precheck regression
+        working-directory: frontend
+        run: npm run test:precheck
+
       - name: Build
         working-directory: frontend
         run: npm run build

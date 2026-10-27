@@ -1,4 +1,5 @@
 import { apiFetch } from './api'
+import { detectBatchConflicts } from './precheck'
 
 import { useEffect, useRef, useState } from 'react'
 import {
@@ -303,7 +304,9 @@ useEffect(() => {
     setNotice('')
 
     try {
-      const conflicts = []
+      const fileWarnings = []
+      // 批次内部先比一次：库为空时两个版本谁也发现不了谁
+      const batchWarnings = detectBatchConflicts(pdfFiles)
 
       for (let i = 0; i < pdfFiles.length; i += 1) {
         setNotice(`正在检查 ${i + 1}/${pdfFiles.length}：${pdfFiles[i].name}`)
@@ -311,13 +314,25 @@ useEffect(() => {
           // 批量较大且文件名没有 arXiv 编号时，跳过昂贵的语义比对
           allowSemantic: pdfFiles.length <= 3,
         })
-        if (warning) conflicts.push(warning)
+        if (warning) fileWarnings.push(warning)
       }
 
-      if (conflicts.length > 0) {
+      if (fileWarnings.length > 0 || batchWarnings.length > 0) {
+        const sections = []
+
+        if (fileWarnings.length > 0) {
+          sections.push(
+            `与已入库论文重复或版本冲突（${fileWarnings.length} 个文件）：\n\n` +
+              fileWarnings.join('\n')
+          )
+        }
+
+        if (batchWarnings.length > 0) {
+          sections.push(batchWarnings.join(''))
+        }
+
         const confirmed = window.confirm(
-          `检测到 ${conflicts.length} 个文件存在重复或版本冲突：\n\n` +
-          `${conflicts.join('\n')}\n` +
+          `${sections.join('\n')}\n` +
           `继续上传会重新索引这些文件。\n` +
           `选择“取消”不会修改已有论文。`
         )
