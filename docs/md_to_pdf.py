@@ -68,9 +68,18 @@ def is_cjk(char: str) -> bool:
         return True
     # 西文字体（Helvetica/Courier）缺少常见符号字形，交给宋体渲染：
     # 箭头、制表符、几何图形、以及 U+2010 起的通用标点
-    if 0x2190 <= code <= 0x27BF or code in (0x2022, 0x2026, 0x2018, 0x2019, 0x201C, 0x201D, 0x2014):
+    if 0x2190 <= code <= 0x27BF or code in (
+        0x2022, 0x2026, 0x2010, 0x2011, 0x2012, 0x2013, 0x2014, 0x2015,
+        0x2018, 0x2019, 0x201A, 0x201C, 0x201D, 0x201E, 0x2030, 0x2032,
+        0x2033, 0x00B1, 0x00D7, 0x00F7,
+    ):
         return True
     return False
+
+
+# 版面折行的 token 划分：ASCII 词（含路径、数字、版本号）整体不拆，
+# 其余字符（包括中日韩文字）逐个可断，避免把 1546 或 bench_long_document.py 劈成两半
+WORD_TOKEN_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/%+~\-]*|.", re.S)
 
 
 # ------------------------------------------------------------------ Markdown 解析
@@ -332,6 +341,7 @@ class DocBuilder:
         self.page = None
         self.y = 0.0
         self.page_no = 0
+        self.text_spans = 0
         self.headings: list[tuple[int, str, int]] = []
 
     # -------------------------------------------------------- 页面
@@ -340,6 +350,7 @@ class DocBuilder:
         self.page = self.pdf.new_page(width=PAGE_WIDTH, height=PAGE_HEIGHT)
         self.page_no += 1
         self.y = MARGIN_TOP
+        self.text_spans = 0
         return self.page
 
     def ensure(self, height: float):
@@ -364,6 +375,7 @@ class DocBuilder:
                 "border_width": 0.30 / max(segment.size, 1.0),
             })
         self.page.insert_text((x, baseline), segment.text, **kwargs)
+        self.text_spans += 1
 
     def draw_segments(self, x: float, baseline: float, segments: list[Segment]) -> float:
         cursor = x
@@ -380,36 +392,61 @@ class DocBuilder:
         """
         lines: list[list[Segment]] = [[]]
         used = 0.0
-        pending: Segment | None = None
-        buffer = ""
+        run_style: tuple | None = None
+        run_text = ""
 
-        def flush():
-            nonlocal pending, buffer
-            if pending is not None and buffer:
-                lines[-1].append(Segment(
-                    buffer, pending.font, pending.size, pending.color, pending.bold,
-                ))
-            buffer = ""
+        def flush_run():
+            nonlocal run_text, run_style
+            if run_style is not None and run_text:
+                font, size, color, bold = run_style
+                lines[-1].append(Segment(run_text, font, size, color, bold))
+            run_text = ""
+
+        def break_line(style):
+            nonlocal used, run_style
+            flush_run()
+            lines.append([])
+            used = 0.0
+            run_style = style
+
+        def has_content() -> bool:
+            # 当前行的内容可能还压在 run_text 里，尚未落到 lines[-1]
+            return bool(run_text.strip()) or bool(lines[-1])
 
         for segment in segments:
-            if pending is not None and (
-                segment.font, segment.size, segment.color, segment.bold
-            ) != (pending.font, pending.size, pending.color, pending.bold):
-                flush()
-                pending = None
+            style = (segment.font, segment.size, segment.color, segment.bold)
 
-            pending = segment
+            if run_style is not None and style != run_style:
+                flush_run()
+            run_style = style
 
-            for char in segment.text:
-                char_width = text_width(char, segment.size, segment.font)
-                if used + char_width > width and (buffer or lines[-1]):
-                    flush()
-                    lines.append([])
-                    used = 0.0
-                buffer += char
-                used += char_width
+            for token in WORD_TOKEN_RE.findall(segment.text):
+                token_width = text_width(token, segment.size, segment.font)
 
-        flush()
+                if token.isspace():
+                    if used + token_width > width and has_content():
+                        break_line(style)  # 行尾空格直接丢掉
+                        continue
+                    run_text += token
+                    used += token_width
+                    continue
+
+                if used + token_width > width and has_content():
+                    break_line(style)
+
+                if token_width > width:
+                    # 比整行还宽的 token（超长路径）：退化为逐字符硬切
+                    for char in token:
+                        char_width = text_width(char, segment.size, segment.font)
+                        if used + char_width > width and has_content():
+                            break_line(style)
+                        run_text += char
+                        used += char_width
+                else:
+                    run_text += token
+                    used += token_width
+
+        flush_run()
         return [line for line in lines if line]
 
     # -------------------------------------------------------- 结构块
@@ -418,7 +455,9 @@ class DocBuilder:
         size = HEADINGS[level]
 
         if level == 1:
-            if self.page is not None:
+            # 只有当前页已经排过正文时才翻页：上一块刚好排满、或本页只剩一条分隔线时，
+            # 再翻一次就会留出整页空白
+            if self.page is not None and self.text_spans > 0:
                 self.new_page()
         else:
             self.ensure(size + 46)
@@ -817,7 +856,7 @@ class DocBuilder:
                 x += segment.width()
 
 
-def dispatch(builder: DocBuilder, block: dict):
+def dispatch(builder: DocBuilder, block: dict, next_block: dict | None = None):
     kind = block["type"]
 
     if kind == "heading":
@@ -849,6 +888,9 @@ def dispatch(builder: DocBuilder, block: dict):
     elif kind == "table":
         builder.add_table(block["header"], block["rows"])
     elif kind == "hr":
+        # 紧跟一级标题的分隔线是多余的：章节自己就会翻页并画一条强调线
+        if next_block and next_block.get("type") == "heading" and next_block.get("level") == 1:
+            return
         builder.ensure(18)
         builder.page.draw_line((MARGIN_LEFT, builder.y + 6),
                                (PAGE_WIDTH - MARGIN_RIGHT, builder.y + 6),
@@ -866,8 +908,9 @@ def build(source_path: Path, pdf_path: Path, subtitle: str,
     probe = fitz.open()
     builder = DocBuilder(probe, offset_pages=0)
     builder.cover(subtitle, meta)
-    for block in blocks:
-        dispatch(builder, block)
+    for index, block in enumerate(blocks):
+        following = blocks[index + 1] if index + 1 < len(blocks) else None
+        dispatch(builder, block, following)
     headings = builder.headings
     probe.close()
 
@@ -881,8 +924,9 @@ def build(source_path: Path, pdf_path: Path, subtitle: str,
         [(level, title, page + toc_pages) for level, title, page in headings],
         toc_pages,
     )
-    for block in blocks:
-        dispatch(builder, block)
+    for index, block in enumerate(blocks):
+        following = blocks[index + 1] if index + 1 < len(blocks) else None
+        dispatch(builder, block, following)
 
     builder.decorate()
     final.set_metadata({
