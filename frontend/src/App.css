@@ -54,7 +54,14 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 .empty-papers { display: grid; place-items: center; gap: 9px; padding: 23px 8px; color: #a5a8b8; font-size: 11px; text-align: center; }
 .paper-item { display: flex; align-items: center; gap: 9px; padding: 10px 8px; color: #777c91; font-size: 11px; min-width: 0; }
 .paper-item svg { color: #8478e9; flex-shrink: 0; }
-.paper-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.paper-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+.paper-download {
+  flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
+  width: 23px; height: 23px; border-radius: 7px; color: #8478e9 !important;
+  opacity: .5; transition: opacity .15s ease, background .15s ease;
+}
+.paper-item:hover .paper-download { opacity: 1; }
+.paper-download:hover { background: #f0edff; color: #4c3fd6 !important; opacity: 1; }
 .sidebar-bottom { margin-top: auto; border-top: 1px solid #eff0f5; padding: 18px 3px 3px; display: flex; align-items: center; gap: 9px; }
 .profile-avatar, .avatar-small, .user-avatar { display: grid; place-items: center; background: #eeeaff; color: #6254d8; border-radius: 50%; font-weight: 750; }
 .profile-avatar { width: 34px; height: 34px; font-size: 13px; }

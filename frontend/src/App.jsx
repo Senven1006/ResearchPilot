@@ -1,9 +1,9 @@
-import { apiFetch } from './api'
+import { apiFetch, withToken } from './api'
 import { detectBatchConflicts } from './precheck'
 
 import { useEffect, useRef, useState } from 'react'
 import {
-  Activity, BookOpen, Bot, FileText, FolderOpen,
+  Activity, BookOpen, Bot, Download, FileText, FolderOpen,
   GraduationCap, MessageSquare, Plus, Send, Settings2,
   ShieldCheck, Sparkles, Upload, PanelLeftClose,
 } from 'lucide-react'
@@ -174,6 +174,7 @@ export default function App() {
   const [compareMode, setCompareMode] = useState(false)
   const [comparePapers, setComparePapers] = useState([])
   const [libraryFiles, setLibraryFiles] = useState([])
+  const [libraryEntries, setLibraryEntries] = useState([])
   const [writingOpen, setWritingOpen] = useState(false)
   const fileRef = useRef(null)
   const chatRef = useRef(null)
@@ -201,6 +202,24 @@ async function loadLibrary() {
     if (!res.ok) return
     const data = await res.json()
     setLibraryFiles(data.indexed_files || [])
+
+    // files[] 里带 sha256 与 downloadable/file_url，用来决定是否显示"下载原文"
+    const entries = Array.isArray(data.files) ? data.files : []
+    setLibraryEntries(entries)
+
+    // 刷新后列表为空时，用已入库的文件回填，否则只有本次上传的论文可见
+    if (entries.length > 0) {
+      setPapers(prev => (
+        prev.length > 0
+          ? prev
+          : entries.map(entry => ({
+            id: `library:${entry.filename}`,
+            name: entry.filename,
+            result: null,
+            file: null,
+          }))
+      ))
+    }
   } catch (error) {
     console.error('读取论文库失败：', error)
   }
@@ -570,7 +589,11 @@ useEffect(() => {
               <span>上传论文后显示在这里</span>
             </div>
           
-) : papers.map(paper => (
+) : papers.map(paper => {
+  const entry = libraryEntries.find(item => item.filename === paper.name)
+  const canDownload = Boolean(entry?.downloadable && entry?.file_url)
+
+  return (
   <div
     className={`paper-item ${
       activePaper?.id === paper.id ? 'active' : ''
@@ -582,8 +605,20 @@ useEffect(() => {
   >
     <FileText size={16} />
     <span title={paper.name}>{paper.name}</span>
+    {canDownload && (
+      <a
+        className="paper-download"
+        href={withToken(entry.file_url)}
+        download={paper.name}
+        title={`下载原文 PDF：${paper.name}`}
+        onClick={event => event.stopPropagation()}
+      >
+        <Download size={14} />
+      </a>
+    )}
   </div>
-))}
+  )
+})}
 
         </div>
 
