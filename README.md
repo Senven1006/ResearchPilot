@@ -157,10 +157,10 @@ uvicorn main:app --reload --port 8000
 ```bash
 cd ResearchPilot/frontend
 npm install
-npm run dev                     # 默认 http://127.0.0.1:5173
+npm run dev                     # 默认 http://localhost:5173
 ```
 
-浏览器打开 <http://127.0.0.1:5173>：右上角出现「后端已连接」即联调成功。
+浏览器打开 <http://localhost:5173>：右上角出现「后端已连接」即联调成功。
 
 ### 4.4 三分钟验证
 
