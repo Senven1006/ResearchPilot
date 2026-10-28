@@ -202,10 +202,10 @@ npm run dev                     # 默认 http://localhost:5173
 ```bash
 cd ResearchPilot/backend
 pip install -r requirements-dev.txt      # 含 pytest
-python -m pytest                         # 16 个用例，约 3 秒
+python -m pytest                         # 19 个用例，约 3 秒
 ```
 
-覆盖范围：健康检查与降级后端、结构化解析（标题树 / 参考文献切分）、入库与原件留档、内容级去重、问答证据与断言核验（含刻意答错数字被标出）、划词翻译与缓存、分章节翻译的缓存命中、CSV 图表生成、非 CSV 拒绝、库内文献回填、越界引用检测、鉴权开关（无 token / 错 token / header / `?token=` 四种情况）。
+覆盖范围：健康检查与降级后端、结构化解析（标题树 / 参考文献切分）、入库与原件留档、内容级去重、问答证据与断言核验（含刻意答错数字被标出）、划词翻译与缓存、分章节翻译的缓存命中、CSV 图表生成、非 CSV 拒绝、库内文献回填、越界引用检测、鉴权开关（无 token / 错 token / header / `?token=` 四种情况）、`/api` 前缀改写、演示数据生成。
 
 前端检查：
 
@@ -217,6 +217,28 @@ npm run build
 ```
 
 推送或提 PR 时 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) 会自动跑后端 pytest + 前端 lint / 查重回归 / build 三段流水线。
+
+### 4.6 在线演示（公网部署）
+
+赛事要求提供可公网访问的地址，仓库已带单容器部署方案：`Dockerfile`（Node 构建前端 → Python 装后端 → 一个进程同时提供 API 与页面）+ `render.yaml`（Render 免费层 Blueprint）。分步指南与免费层限制见 [`docs/deploy-render.md`](docs/deploy-render.md)。
+
+要点：
+
+- 前端请求统一走 `/api/*`，后端用中间件剥前缀转发，**同源、无需 CORS**，一套构建产物在本地 vite（代理）与线上单容器（改写）都能用
+- `DEMO_SEED=1`：空库自动灌入一篇"系统生成的示例论文"，评审打开即可提问（免费层磁盘是临时的，重启后自动重灌）
+- `MAX_PAGES=80`：免费实例 512 MB 内存，超限返回 413 而不是 OOM；百页级长文档请在本地跑 `backend/bench_long_document.py`
+- 免费层 15 分钟无访问休眠，首访 30–60 秒冷启动，评审期间建议用定时任务 ping `/health` 保活
+
+本地模拟线上运行方式（无需 Docker）：
+
+```powershell
+cd ResearchPilot\backend
+$env:FRONTEND_DIST="D:\ResearchPilot\frontend\dist"   # 先 npm run build
+$env:DEMO_SEED="1"
+$env:CHROMA_PATH="D:\ResearchPilot\data\deploy-test\chroma"
+.\.venv\Scripts\python.exe -m uvicorn main:app --port 8000
+# 打开 http://127.0.0.1:8000/ 即为"线上形态"
+```
 
 ---
 
@@ -233,6 +255,9 @@ npm run build
 | `CHROMA_PATH` | 否 | `D:/ResearchPilot/data/chroma` | 向量库路径；同级自动创建 `parsed/` `figures/` `translated/` `charts/` `papers/` |
 | `API_TOKEN` | 否 | 空 | 留空 = 不校验（本地开发默认）；填了就要求所有接口带 `X-API-Token` 头或 `?token=` 参数 |
 | `ALLOW_ORIGINS` | 否 | `http://127.0.0.1:5173,http://localhost:5173` | CORS 白名单，逗号分隔；填 `*` 放开所有来源 |
+| `MAX_PAGES` | 否 | `600` | 单文档页数上限；公网小内存实例（如 512 MB）建议收到 80–120 |
+| `FRONTEND_DIST` | 否 | `../frontend/dist` | 单容器部署时前端构建产物目录，存在则后端直接托管页面 |
+| `DEMO_SEED` | 否 | 空 | 设为 `1` 时空库自动灌入一篇系统生成的示例论文，供在线演示用 |
 
 两种嵌入后端的数据互不混写：Ollama 模式用 `research_papers` / `paper_units`，降级模式用 `research_papers_hash` / `paper_units_hash`，因此切换后端不会损坏已有索引。当前状态可通过 `GET /health` 的 `embedding`、`local_chat_available`、`fallback_mode` 字段查看（前端模型卡片也会实时显示）。
 
@@ -285,13 +310,29 @@ ALLOW_ORIGINS=http://127.0.0.1:5173
 8. 降级模式下 `research_papers` 与 `research_papers_hash` 是两套索引：切换到 Ollama 后需要**重新索引**才能在语义空间下检索。
 9. **长文档解析是同步请求**：几百页的 PDF 解析期间 HTTP 连接会一直占着（120 页约 11 秒，尚可接受；更长的文档体验会变差）。后台任务队列 + 进度轮询 + 取消还没做，属于下一步工作。
 10. 原件留档会额外占用磁盘（一份 PDF 存一份），目前没有自动清理策略，需要手动清 `data/papers/`。
-11. **长文档入库是同步请求**：541 页实测约 74 秒，期间 HTTP 连接一直占着，没有进度条与取消；后台任务队列还没做。单文档上限 600 页。
+11. **长文档入库是同步请求**：541 页实测约 73 秒，期间 HTTP 连接一直占着，没有进度条与取消；后台任务队列还没做。单文档上限 600 页（公网小内存实例通过 `MAX_PAGES` 收紧）。
 12. **标题树在超大文档上会并节**：541 页的书有 181 节，但最大单节达 29 万字符（全书性章节），按节浏览的粒度会变粗；正文检索仍按单元进行，不受影响。
+13. **在线演示实例的内存受限**：Render 免费层 512 MB，`MAX_PAGES=80`；页面在休眠后首访需 30–60 秒冷启动，容器磁盘为临时存储（重启后索引清空，示例论文会自动重灌）。
 
 ---
 
+## 8. 团队信息
 
-## 8. 许可与致谢
+| 项 | 内容 |
+|---|---|
+| 队伍名称 | 待填写 |
+| 参赛赛事 | 待填写（如：中国大学生计算机设计大赛 / AI 大模型创新应用挑战赛） |
+| 参赛学校 / 学院 | 待填写 |
+| 队长 | 待填写 |
+| 队员 | 待填写 |
+| 指导教师 | 待填写 |
+| 联系方式 | 待填写 |
+
+> 以上字段需由参赛队填写，仓库不会填写或伪造任何团队信息。
+
+---
+
+## 9. 许可与致谢
 
 - 本项目依赖的开源组件许可证见各组件仓库：PyMuPDF、ChromaDB、FastAPI、RapidOCR-onnxruntime、React、Vite、lucide-react。
 - 使用 DeepSeek / Ollama 模型时请遵守对应服务条款；论文版权归原作者所有，本项目仅做本地解析与检索。
