@@ -1,0 +1,36 @@
+# Render Blueprint：一键把 ResearchPilot 部署成公网可访问的在线演示
+# 用法：Render 控制台 → New → Blueprint → 选本仓库 → 应用下面的服务
+#
+# 注意（免费层）：
+#   - 容器磁盘是临时的，重启/重新部署后 data/ 会被清空
+#   - 15 分钟无访问会休眠，首次访问需等待约 30–60 秒冷启动
+#   - 免费层不支持持久磁盘；如需长期保留索引请升级实例或挂载磁盘
+services:
+  - type: web
+    name: researchpilot
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: singapore
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      # 在线模型 Key：在 Render 控制台填入，不要写进仓库
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: DEEPSEEK_MODEL
+        value: deepseek-flash
+      # 演示用：空库时自动灌入一篇"系统生成的示例论文"
+      - key: DEMO_SEED
+        value: "1"
+      - key: CHROMA_PATH
+        value: /data/chroma
+      # 免费层只有 512 MB 内存，541 页那种书会 OOM；演示实例把上限收到 80 页
+      - key: MAX_PAGES
+        value: "80"
+      # 同源访问，放开来源不影响安全；如需收紧改成实际站点域名
+      - key: ALLOW_ORIGINS
+        value: "*"
+      # 公网演示不设口令；若要防滥用，设置 API_TOKEN 并在提交材料里给出访问方式
+      - key: API_TOKEN
+        value: ""

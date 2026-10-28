@@ -297,3 +297,35 @@ def test_cors_preflight_bypasses_token_guard(client, monkeypatch):
         ).status_code == 401
     finally:
         monkeypatch.setattr(main, "API_TOKEN", "")
+
+
+def test_api_prefix_is_stripped_for_single_container_deploy(client):
+    """/api/... 必须等价于 /...，这样同一套构建产物在 vite 代理和单容器部署下都能用。"""
+    assert client.get("/api/health").status_code == 200
+    assert client.get("/api/papers/status").status_code == 200
+
+    prefixed = client.get("/api/health").json()
+    plain = client.get("/health").json()
+    assert prefixed["status"] == plain["status"]
+
+
+def test_api_prefix_respects_token_guard(client, monkeypatch):
+    monkeypatch.setattr(main, "API_TOKEN", "secret-token")
+
+    try:
+        assert client.get("/api/papers/status").status_code == 401
+        assert client.get(
+            "/api/papers/status", headers={"X-API-Token": "secret-token"}
+        ).status_code == 200
+    finally:
+        monkeypatch.setattr(main, "API_TOKEN", "")
+
+
+def test_demo_seed_pdf_has_structure():
+    """演示数据要能被结构化解析成单元，否则在线实例打开就是空库。"""
+    from demo_seed import DEMO_FILENAME, build_demo_pdf
+
+    content = build_demo_pdf()
+    assert content.startswith(b"%PDF-")
+    assert DEMO_FILENAME.endswith(".pdf")
+

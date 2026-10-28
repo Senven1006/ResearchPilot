@@ -11,14 +11,16 @@ import chromadb
 import fitz
 import httpx
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
 
 import dataviz
 import embedding
+from demo_seed import DEMO_FILENAME, build_demo_pdf
 from pdf_structure import StructureParser
 from translation import (
     TranslationError,
@@ -96,8 +98,19 @@ ALLOW_ORIGINS = [
 ]
 PUBLIC_PATHS = {"/", "/health", "/docs", "/redoc", "/openapi.json"}
 
+# 公网部署：前端构建产物由本进程直接托管（Docker 镜像里放在 /app/frontend/dist）。
+# 前端所有请求都带 /api 前缀，由下面的 StripApiPrefix 中间件剥掉，行为与 vite 代理一致。
+FRONTEND_DIST = Path(os.getenv(
+    "FRONTEND_DIST",
+    str(Path(__file__).resolve().parent.parent / "frontend" / "dist"),
+))
+# 演示实例首次启动时自动灌一篇"系统生成的示例论文"，避免评审打开时看到空库
+DEMO_SEED = os.getenv("DEMO_SEED", "").strip().lower() in {"1", "true", "yes", "on"}
+
 MAX_FILE_SIZE = 30 * 1024 * 1024
-MAX_PAGES = 600
+# 单文档页数上限：免费级容器内存有限（如 Render 免费层 512 MB），
+# 长文档请在本地用 bench_long_document.py 压测，公网演示可用环境变量收紧
+MAX_PAGES = int(os.getenv("MAX_PAGES", "600"))
 MAX_BATCH_FILES = 20
 CHUNK_SIZE = 800
 CHUNK_OVERLAP = 120
@@ -165,6 +178,27 @@ async def enforce_api_token(request, call_next):
                 status_code=401,
             )
     return await call_next(request)
+
+
+class StripApiPrefix:
+    """把 /api/... 改写成 /...，让单进程部署与 vite 代理下的前端共用一套接口。
+
+    Starlette 的中间件是"后添加的在外层"，因此这个类在文件末尾才注册，
+    保证改写先于令牌校验发生。
+    """
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope.get("type") in {"http", "websocket"}:
+            path = scope.get("path") or ""
+            if path == "/api" or path.startswith("/api/"):
+                stripped = path[4:] or "/"
+                scope = dict(scope)
+                scope["path"] = stripped
+                scope["raw_path"] = stripped.encode("utf-8")
+        await self.app(scope, receive, send)
 
 # Chroma 将向量和元数据保存到磁盘，重启后自动加载
 Path(CHROMA_PATH).mkdir(parents=True, exist_ok=True)
@@ -389,10 +423,15 @@ def extract_pdf_pages(content: bytes) -> list[dict]:
 
 @app.get("/")
 def root():
+    # 单进程部署时 / 直接返回构建好的前端页面；本地开发（没有 dist）时返回服务信息
+    index = FRONTEND_DIST / "index.html"
+    if index.exists():
+        return FileResponse(index)
     return {
         "project": "ResearchPilot",
         "status": "running",
-        "version": "0.4.0",
+        "version": "0.5.0",
+        "ui": "前端开发服务器请另开 http://localhost:5173",
     }
 
 
@@ -1985,9 +2024,17 @@ async def writing_translate(request: AcademicTranslateRequest):
 
 @app.post("/dataviz/report")
 async def dataviz_report(
-    file: UploadFile = File(...), charts: str = "line,bar,radar3d"
+    file: UploadFile = File(...),
+    charts: str = Query(
+        "line,bar,radar3d",
+        description="要生成的图表，逗号分隔，可选 line / bar / radar3d",
+    ),
 ):
-    """上传 CSV，返回画像 + 统计表 + 折线/柱状/三维雷达图 + 学术图注。"""
+    """上传 CSV，返回画像 + 统计表 + 折线/柱状/三维雷达图 + 学术图注。
+
+    `charts` 走查询参数（`?charts=line`），不要塞进 multipart 表单，
+    否则会被当成未知字段忽略而回落到默认三张图。
+    """
     filename = Path(file.filename or "data.csv").name
     if not filename.lower().endswith(".csv"):
         raise HTTPException(status_code=400, detail="请上传 .csv 文件。")
@@ -2027,3 +2074,35 @@ async def dataviz_chart(stem: str, name: str):
         raise HTTPException(status_code=404, detail="图表不存在。")
 
     return FileResponse(path, media_type="image/svg+xml")
+
+
+# ------------------------------------------------------------------ 公网部署支持
+
+
+@app.on_event("startup")
+async def seed_demo_library():
+    """空库 + 演示模式时灌入一篇示例论文，让评审打开即可提问。"""
+    if not DEMO_SEED:
+        return
+    try:
+        if chunk_store().count() > 0 or unit_store().count() > 0:
+            return
+        content = build_demo_pdf()
+        result = await index_one_pdf(content, DEMO_FILENAME, with_units=True)
+        print(
+            "演示数据已入库：",
+            result["filename"],
+            f"页数={result['page_count']}",
+            f"块={result['chunks_indexed']}",
+            f"单元={result['units_indexed']}",
+        )
+    except Exception as exc:  # 灌数据失败不能影响服务启动
+        print("演示数据入库失败：", exc)
+
+
+if FRONTEND_DIST.exists():
+    # 前端构建产物由后端直接托管；/api 前缀由 StripApiPrefix 剥掉
+    app.mount("/", StaticFiles(directory=FRONTEND_DIST, html=True), name="ui")
+
+# 最后注册 → 位于最外层，先改写 /api 再交给令牌校验与路由
+app.add_middleware(StripApiPrefix)

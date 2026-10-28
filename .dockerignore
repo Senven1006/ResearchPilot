@@ -1,0 +1,24 @@
+# 构建上下文瘦身 + 安全：绝不把本地密钥与运行数据打进镜像
+.git
+.gitignore
+.reasonix
+reasonix.toml
+
+# 本地环境与依赖
+backend/.venv
+backend/__pycache__
+backend/**/__pycache__
+**/*.py[cod]
+backend/.env
+backend/.env.*
+frontend/node_modules
+frontend/dist
+frontend/.env
+frontend/.env.*
+
+# 运行期数据与文档产物
+data
+docs
+samples
+*.pdf
+!docs/ResearchPilot-technical-doc.pdf
