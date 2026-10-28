@@ -29,3 +29,7 @@ uploads/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Local tool state（本机 CLI 代理的权限日志，不应入库）
+.reasonix/
+reasonix.toml

@@ -96,6 +96,7 @@ ResearchPilot/
 │   ├── src/App.css / index.css
 │   ├── vite.config.js       # /api → 127.0.0.1:8000 代理
 │   └── package.json
+├── samples/                 # 演示数据（training-log.csv 供可视化模块使用）
 ├── data/                    # 运行期生成（已 gitignore）
 ├── docs/                    # 技术文档（Markdown 源 + 渲染/版式校验脚本 + PDF + 长文档压测输出）
 ├── .gitignore
@@ -171,8 +172,9 @@ npm run dev                     # 默认 http://localhost:5173
 2. 问「训练用的 GPU 型号和数量是多少」→ 证据卡片应指向 `6.1 Machine Translation · 第 7 页`，核验面板显示支持度。
 3. 打开「结构化解析」→ 查看标题树 / 表格 / 图表 / 公式 / 参考文献。
 4. 点「中英对照」→ 当前章节先出译文，读完点「继续翻译」译下一节。
-5. 侧栏「写作辅助」→ 生成框架（参考文献来自库内论文）、上传 CSV 出图表与图注。
+5. 侧栏「写作辅助」→ 生成框架（参考文献来自库内论文）；「数据图表」上传 `samples/training-log.csv` → 一张表出**折线 + 柱状 + 三维雷达**三张图与确定性图注（示例见下表）。
 6. 侧栏论文列表里，每篇论文名右侧有一个下载图标（鼠标移上去才显示）→ 点它取回入库时留档的原始 PDF（见 §6 的 `/papers/file/{sha256}`）。
+   `samples/training-log.csv` 是 12 行 × 6 列的训练日志（`epoch, phase, train_loss, val_loss, bleu, learning_rate`），上传后返回：折线「train_loss 随 epoch 下降 3.42 → 0.82（-76.0%），最陡区间 1 → 2」、柱状「warmup 2.86 / anneal 0.897，极差 1.96」、雷达「6 组记录 × 4 指标归一化对比」。列结构决定图表类型：单调数值列作横轴 → 折线；存在类别列 → 柱状；多数值列 → 雷达。
 7. 长文档鲁棒性（可选，约 90 秒）：拿一本 500 页以上的书跑一遍压测，验证切块、索引、分级加载与内存。
 
    ```bat
