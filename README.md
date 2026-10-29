@@ -4,9 +4,12 @@
 
 > 设计原则只有一条：**能给出出处就说，给不出就明确说不知道**。所有结论都绑定到「哪篇论文、第几页、哪一节」的证据锚点上。
 
+**在线演示：<http://114.55.81.188:8000>**（阿里云 ECS 单容器部署，可直接提问、上传 PDF、出图表；内置一篇系统生成的示例论文）
+
 ---
 
-> 交付文档：技术文档见 [`docs/ResearchPilot-technical-doc.pdf`](docs/ResearchPilot-technical-doc.pdf)（20 页），
+> 交付文档：技术文档见 [`docs/ResearchPilot-technical-doc.pdf`](docs/ResearchPilot-technical-doc.pdf)（25 页），
+> 作品介绍文档见 [`docs/ResearchPilot-project-intro.pdf`](docs/ResearchPilot-project-intro.pdf)（12 页），
 > 源文件为 [`docs/technical-doc.md`](docs/technical-doc.md)，由 [`docs/md_to_pdf.py`](docs/md_to_pdf.py) 渲染。
 > 直链下载：<https://raw.githubusercontent.com/Senven1006/ResearchPilot/main/docs/ResearchPilot-technical-doc.pdf>
 

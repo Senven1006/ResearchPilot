@@ -481,7 +481,9 @@ docker run -p 8000:8000 \
 # 打开 http://127.0.0.1:8000/ 就是线上形态
 ```
 
-Render 免费层可直接用仓库里的 `render.yaml`（New → Blueprint → 选仓库 → 填 `DEEPSEEK_API_KEY`），首次构建约 5–10 分钟。免费层三个限制必须写进提交材料：15 分钟无访问休眠（首访 30–60 秒冷启动）、容器磁盘临时（重启后索引清空，示例论文自动重灌）、512 MB 内存（`MAX_PAGES` 收到 80）。
+Render 免费层可直接用仓库里的 `render.yaml`（New → Blueprint → 选仓库 → 填 `DEEPSEEK_API_KEY`），首次构建约 5–10 分钟。免费层三个限制必须写进提交材料：15 分钟无访问休眠（首访 30–60 秒冷启动）、容器磁盘临时（重启后索引清空、示例论文自动重灌）、512 MB 内存（`MAX_PAGES` 收到 80）。
+
+本项目实际使用的部署环境是**阿里云 ECS（Ubuntu 22.04，2 核 2G）单容器**：`docker build` 时把 Debian apt 源与 PyPI、npm 换成国内镜像（否则 2G 机器上仅拉依赖就要半小时以上），容器以 `--restart unless-stopped` 常驻，数据落 `researchpilot-data` 卷。在线地址：<http://114.55.81.188:8000>。
 
 ## 6.6 已知限制
 
