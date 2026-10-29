@@ -30,6 +30,10 @@ uploads/
 .DS_Store
 Thumbs.db
 
+# 本机杂项文档（不属于作品内容，避免误提交）
+*.doc
+*.docx
+
 # Local tool state（本机 CLI 代理的权限日志，不应入库）
 .reasonix/
 reasonix.toml

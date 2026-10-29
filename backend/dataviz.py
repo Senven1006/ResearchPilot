@@ -165,7 +165,9 @@ def _format_number(value: float, digits: int = 3) -> str:
     if abs(value) >= 1000:
         return f"{value:,.0f}"
     if abs(value) >= 10:
-        return f"{value:.1f}"
+        text = f"{value:.1f}"
+        # 11.0 这种整数值不必带小数点，否则刻度里会出现 1/3/5/7/9/11.0 的不一致
+        return text[:-2] if text.endswith(".0") else text
     return f"{value:.{digits}g}"
 
 
@@ -719,6 +721,22 @@ def build_report(
                 values.append(float(cell.replace(",", "")))
             if len(values) == len(metrics):
                 series.append((row[label_index] or f"记录{len(series) + 1}", values))
+
+        # 同一标签可能重复（例如按阶段分组时多行都叫 warmup），
+        # 重复的标签加序号，否则图例里会出现三个一模一样的条目
+        label_count: dict[str, int] = {}
+        for label, _ in series:
+            label_count[label] = label_count.get(label, 0) + 1
+        if any(count > 1 for count in label_count.values()):
+            seen: dict[str, int] = {}
+            numbered = []
+            for label, values in series:
+                if label_count[label] > 1:
+                    seen[label] = seen.get(label, 0) + 1
+                    numbered.append((f"{label} #{seen[label]}", values))
+                else:
+                    numbered.append((label, values))
+            series = numbered
 
         if len(series) >= 2:
             normalized = [

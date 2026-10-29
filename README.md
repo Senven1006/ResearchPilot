@@ -98,7 +98,7 @@ ResearchPilot/
 │   └── package.json
 ├── samples/                 # 演示数据（training-log.csv 供可视化模块使用）
 ├── data/                    # 运行期生成（已 gitignore）
-├── docs/                    # 技术文档（Markdown 源 + 渲染/版式校验脚本 + PDF + 长文档压测输出）
+├── docs/                    # 技术文档 + 作品介绍文档（Markdown 源 + 渲染/版式校验脚本 + PDF + 截图 + 长文档压测输出）
 ├── .gitignore
 └── README.md
 ```

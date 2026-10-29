@@ -22,6 +22,7 @@
 
 from __future__ import annotations
 
+import argparse
 import math
 import re
 import sys
@@ -37,6 +38,7 @@ CONTENT_WIDTH = PAGE_WIDTH - MARGIN_LEFT - MARGIN_RIGHT
 BODY_SIZE = 10.5
 LINE_HEIGHT = 17.4
 TITLE = "ResearchPilot 技术文档"
+COVER_KIND = "技术文档"
 VERSION = "v0.5.0 · 2026-10"
 
 # 字体：中文宋体 + 西文 Helvetica + 等宽 Courier
@@ -164,6 +166,16 @@ def parse_markdown(source: str) -> list[dict]:
                 "type": "heading",
                 "level": len(heading.group(1)),
                 "text": plain(heading.group(2).strip()),
+            })
+            index += 1
+            continue
+
+        image = re.match(r"^!\[([^\]]*)\]\((.+?)\)\s*$", stripped)
+        if image:
+            blocks.append({
+                "type": "image",
+                "alt": image.group(1).strip(),
+                "path": image.group(2).strip(),
             })
             index += 1
             continue
@@ -571,6 +583,48 @@ class DocBuilder:
 
         self.y += 12
 
+    def add_image(self, path: str, caption: str = ""):
+        """插入图片：按正文宽度等比缩放，过高时按可用高度再缩，居中并配一行灰色图注。"""
+        target = Path(path)
+        if not target.is_absolute():
+            target = Path(__file__).resolve().parent / target
+        if not target.exists():
+            return
+
+        try:
+            pix = fitz.Pixmap(str(target))
+            image_width, image_height = pix.width, pix.height
+        except Exception:
+            return
+        if not image_width or not image_height:
+            return
+
+        usable = PAGE_HEIGHT - MARGIN_TOP - MARGIN_BOTTOM
+        draw_width = CONTENT_WIDTH
+        draw_height = image_height * (CONTENT_WIDTH / image_width)
+        max_height = usable * 0.62
+        if draw_height > max_height:
+            draw_height = max_height
+            draw_width = image_width * (max_height / image_height)
+
+        cap_size = 8.4
+        self.ensure(draw_height + (cap_size + 14 if caption else 10))
+        top = self.y
+        left = MARGIN_LEFT + (CONTENT_WIDTH - draw_width) / 2
+
+        self.page.insert_image(
+            fitz.Rect(left, top, left + draw_width, top + draw_height),
+            filename=str(target),
+        )
+        self.y = top + draw_height + 7
+
+        if caption:
+            segments = to_segments(caption, cap_size, COLOR_MUTED)
+            for line in self.wrap(segments, CONTENT_WIDTH - 20):
+                self.draw_segments(MARGIN_LEFT + 10, self.y + cap_size, line)
+                self.y += cap_size + 4
+        self.y += 12
+
     def add_code(self, code_lines: list[str]):
         size = 8.2
         available = CONTENT_WIDTH - 16
@@ -780,7 +834,7 @@ class DocBuilder:
         self.draw_segments(MARGIN_LEFT, 112,
                            to_segments("ResearchPilot", 27, COLOR_ACCENT, bold=True))
         self.draw_segments(MARGIN_LEFT, 150,
-                           to_segments("技术文档", 18, COLOR_TEXT, bold=True))
+                           to_segments(COVER_KIND, 18, COLOR_TEXT, bold=True))
         self.draw_segments(MARGIN_LEFT, 176, to_segments(subtitle, 10.5, COLOR_MUTED))
 
         y = 250
@@ -904,6 +958,8 @@ def dispatch(builder: DocBuilder, block: dict, next_block: dict | None = None):
         builder.add_list_item(text, 18, f"{block['number']}.")
     elif kind == "quote":
         builder.add_quote(parse_inline(block["text"]))
+    elif kind == "image":
+        builder.add_image(block["path"], block["alt"])
     elif kind == "code":
         builder.add_code(block["lines"])
     elif kind == "table":
@@ -966,27 +1022,44 @@ def build(source_path: Path, pdf_path: Path, subtitle: str,
 
 
 def main():
+    global TITLE, VERSION, COVER_KIND
+
+    parser = argparse.ArgumentParser(description="把 Markdown 渲染成带封面与目录的 PDF")
+    parser.add_argument("--source", default="technical-doc.md", help="Markdown 源文件（相对 docs/）")
+    parser.add_argument("--out", default="ResearchPilot-technical-doc.pdf", help="输出 PDF 名（相对 docs/）")
+    parser.add_argument("--title", default=TITLE, help="页眉与封面上方标题")
+    parser.add_argument("--cover-kind", default=COVER_KIND, help="封面大标题下的文档类别，如「技术文档」")
+    parser.add_argument("--subtitle", default="系统设计、AI 技术方案与实现说明", help="封面副标题")
+    parser.add_argument("--doc-type", default="技术文档（项目交付）", help="封面「文档类型」字段")
+    parser.add_argument("--version", default=VERSION, help="页眉版本号")
+    parser.add_argument("--max-pages", type=int, default=30, help="超过该页数时给出警告")
+    args = parser.parse_args()
+
+    TITLE = args.title
+    VERSION = args.version
+    COVER_KIND = args.cover_kind
+
     root = Path(__file__).resolve().parent
-    source = root / "technical-doc.md"
-    target = root / "ResearchPilot-technical-doc.pdf"
+    source = root / args.source
+    target = root / args.out
 
     if not source.exists():
         raise SystemExit(f"缺少内容源文件：{source}")
 
     meta = [
         ("项目名称", "ResearchPilot 面向科研阅读与写作的本地优先 AI 助手"),
-        ("文档类型", "技术文档（项目交付）"),
-        ("版本", "v0.5.0"),
+        ("文档类型", args.doc_type),
+        ("版本", args.version.split("·")[0].strip()),
         ("代码仓库", "https://github.com/Senven1006/ResearchPilot"),
         ("技术栈", "FastAPI · ChromaDB · PyMuPDF · RapidOCR · React 19 · Vite"),
     ]
 
-    result = build(source, target, "系统设计、AI 技术方案与实现说明", meta)
+    result = build(source, target, args.subtitle, meta)
     print(f"已生成：{result['path']}")
     print(f"页数：{result['pages']}（目录 {result['toc_pages']} 页，标题 {result['headings']} 条）")
 
-    if result["pages"] > 30:
-        print("警告：超过 30 页限制", file=sys.stderr)
+    if result["pages"] > args.max_pages:
+        print(f"警告：超过 {args.max_pages} 页限制", file=sys.stderr)
 
 
 if __name__ == "__main__":
