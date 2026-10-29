@@ -4,14 +4,19 @@
 
 # ---------- 1) 前端构建 ----------
 FROM node:22-alpine AS frontend
+# 国内构建时用 --build-arg NPM_REGISTRY=https://registry.npmmirror.com 提速
+ARG NPM_REGISTRY=https://registry.npmjs.org
 WORKDIR /app/frontend
 COPY frontend/package.json frontend/package-lock.json ./
-RUN npm ci
+RUN npm config set registry "$NPM_REGISTRY" && npm ci
 COPY frontend/ ./
 RUN npm run build
 
 # ---------- 2) 后端运行 ----------
 FROM python:3.12-slim
+
+# 国内构建时用 --build-arg PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple 提速
+ARG PIP_INDEX_URL=https://pypi.org/simple
 
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
@@ -26,7 +31,7 @@ RUN apt-get update \
 
 WORKDIR /app/backend
 COPY backend/requirements.txt ./
-RUN pip install -r requirements.txt
+RUN pip install -i "$PIP_INDEX_URL" -r requirements.txt
 
 COPY backend/ ./
 COPY --from=frontend /app/frontend/dist /app/frontend/dist
