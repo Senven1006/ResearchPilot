@@ -37,3 +37,6 @@ Thumbs.db
 # Local tool state（本机 CLI 代理的权限日志，不应入库）
 .reasonix/
 reasonix.toml
+
+# 本地/远程演示实例的运行数据（Codespaces、隧道部署）
+.devdata/

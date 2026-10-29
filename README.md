@@ -240,6 +240,8 @@ $env:CHROMA_PATH="D:\ResearchPilot\data\deploy-test\chroma"
 # 打开 http://127.0.0.1:8000/ 即为"线上形态"
 ```
 
+四条拿到公网地址的路线（Codespaces 免费无卡 / Cloudflare 隧道应急 / 云服务器最稳 / Render 需信用卡）见 [`docs/deploy-online.md`](docs/deploy-online.md)。仓库已带 `.devcontainer/`：在 GitHub 仓库页点 **Code → Codespaces** 创建后，会自动装依赖、构建前端并把服务跑在 8000 端口，把该端口设为 Public 即得到 `https://<名字>-8000.app.github.dev` 演示地址。
+
 ---
 
 ## 5. 环境变量
