@@ -183,6 +183,6 @@ docker system prune -af
 
 ## 部署完成后请做三件事
 
-1. **把地址发我**：`http://<公网IP>:8000`，我同步到 `README.md`、`docs/project-intro.md`（重新生成作品介绍 PDF）与提交包 `00-先读我.md`
+1. **把地址发我**：`http://<公网IP>:8000`，我同步到 `README.md`、`docs/project-intro.md`（重新生成作品介绍 PDF）与提交包 `00-先点我.md`
 2. 填表单第 4 项「在线演示地址」
 3. 评审期间每天打开一次确认可用（`curl http://<IP>:8000/health` 也可以）
