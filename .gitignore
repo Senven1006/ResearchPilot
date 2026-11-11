@@ -24,6 +24,8 @@ data/papers/
 # 引用图谱 / 评测用的独立语料（论文 PDF 与索引都不入库）
 data/graphcorpus/
 data/eval/
+data/cache/
+data/_*
 uploads/
 *.log
 
