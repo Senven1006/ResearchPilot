@@ -18,6 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
 
+import citation_graph
 import dataviz
 import embedding
 from demo_seed import DEMO_FILENAME, build_demo_pdf
@@ -825,6 +826,19 @@ async def index_structure_units(
             "equations": len(structure.get("equations") or []),
             "references": (structure.get("references") or {}).get("count", 0),
         }
+
+        # 顺手落一份解析缓存：引用图谱、后续 /papers/structure 都直接读它，
+        # 不必为了建图再解析一遍 PDF。写盘失败不影响索引。
+        try:
+            PARSED_DIR.mkdir(parents=True, exist_ok=True)
+            cache_path = PARSED_DIR / f"{file_sha256}.json"
+            if not cache_path.exists():
+                cache_path.write_text(
+                    json.dumps(structure, ensure_ascii=False),
+                    encoding="utf-8",
+                )
+        except Exception as exc:  # noqa: BLE001
+            info["cache_warning"] = f"解析缓存写入失败：{exc}"
     except Exception as exc:  # noqa: BLE001
         structured = False
         units = fallback_units(content, filename, file_sha256)
@@ -2076,7 +2090,57 @@ async def dataviz_chart(stem: str, name: str):
     return FileResponse(path, media_type="image/svg+xml")
 
 
-# ------------------------------------------------------------------ 公网部署支持
+# ------------------------------------------------------------ 引用图谱与综述
+
+
+class GraphReviewRequest(BaseModel):
+    topic: str = Field(default="", description="综述主题；为空时按图谱中心性取前 N 篇")
+    top_k: int = Field(default=8, ge=3, le=20)
+
+
+def _graph_state(top_n: int = 10) -> dict:
+    """读当前库的解析缓存并建图。解析缓存由入库过程写入（见 index_structure_units）。"""
+    papers = citation_graph.load_papers(PARSED_DIR)
+    graph = citation_graph.build_graph(papers)
+    analysis = citation_graph.analyze(graph, top_n=top_n)
+    return {"papers": papers, "graph": graph, "analysis": analysis}
+
+
+@app.get("/graph/summary")
+def graph_summary(top_n: int = Query(10, ge=3, le=50)):
+    """库内引用图谱概览：论文数、引用边、共被引对、基石论文、关键共被引。"""
+    state = _graph_state(top_n)
+    analysis = state["analysis"]
+    return {
+        "papers": len(state["papers"]),
+        "stats": analysis["stats"],
+        "foundational": analysis["foundational"],
+        "co_citation": analysis["co_citation"],
+        "internal_edges": analysis["internal_edges"][:top_n * 2],
+        "papers_with_refs": sum(1 for paper in state["papers"] if paper.references),
+        "cached_docs": len(list(PARSED_DIR.glob("*.json"))) if PARSED_DIR.exists() else 0,
+        "foundational_criterion": analysis.get("foundational_criterion"),
+        "weights": citation_graph.FOUNDATIONAL_WEIGHTS,
+        "note": "基石分 = 0.45×PageRank + 0.35×入度 + 0.20×共被引，均在当前库的引用图上计算。",
+    }
+
+
+@app.post("/graph/review")
+def graph_review(request: GraphReviewRequest):
+    """图谱驱动的综述骨架：基石文献 → 方法演化 → 库内引用关系 → 研究缺口。"""
+    state = _graph_state(max(10, request.top_k * 2))
+    outline = citation_graph.review_outline(
+        request.topic, state["papers"], state["graph"], state["analysis"],
+        top_k=request.top_k,
+    )
+    if not outline["papers_selected"]:
+        raise HTTPException(
+            status_code=400,
+            detail="库内还没有可用于建图的论文（需要带参考文献的解析结果）。",
+        )
+    return outline
+
+
 
 
 @app.on_event("startup")

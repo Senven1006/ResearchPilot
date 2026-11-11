@@ -1,10 +1,30 @@
-"""接口级回归测试：解析、索引、留档、去重、问答核验、翻译缓存、可视化与鉴权。"""
+"""接口级回归测试：解析、索引、留档、去重、问答核验、翻译缓存、可视化、鉴权与引用图谱。"""
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import main
+
+
+def _write_parsed(directory: Path, filename: str, title: str, year: int,
+                  references: list[dict], sha: str) -> None:
+    """写一份最小可用的解析缓存（引用图谱只依赖 meta/references/filename）。"""
+    payload = {
+        "schema": "researchpilot.structure/1",
+        "filename": filename,
+        "sha256": sha,
+        "page_count": 12,
+        "meta": {"title": title, "abstract": f"{title} 摘要：注意力与机器翻译。"},
+        "references": {"detected": bool(references), "count": len(references),
+                       "entries": references},
+        "stats": {"year": year},
+        "sections": [],
+    }
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / f"{sha}.json").write_text(json.dumps(payload, ensure_ascii=False),
+                                           encoding="utf-8")
 
 
 def test_requirement_files_stay_pure_ascii():
@@ -329,3 +349,60 @@ def test_demo_seed_pdf_has_structure():
     assert content.startswith(b"%PDF-")
     assert DEMO_FILENAME.endswith(".pdf")
 
+
+def test_graph_summary_builds_citation_edges(client, tmp_path, monkeypatch):
+    parsed = tmp_path / "parsed"
+    _write_parsed(parsed, "2101.00001v1.pdf", "Paper Alpha", 2021, [
+        {"id": "ref-1", "raw": "[1] Beta. arXiv:2101.00002, 2021.", "year": 2021},
+        {"id": "ref-2", "raw": "[2] Attention. arXiv:1706.03762, 2017.", "year": 2017},
+    ], "a" * 64)
+    _write_parsed(parsed, "2101.00002v1.pdf", "Paper Beta", 2021, [
+        {"id": "ref-1", "raw": "[1] Gamma. arXiv:2101.00003, 2022.", "year": 2022},
+        {"id": "ref-2", "raw": "[2] Attention. arXiv:1706.03762, 2017.", "year": 2017},
+    ], "b" * 64)
+    _write_parsed(parsed, "2101.00003v1.pdf", "Paper Gamma", 2022, [], "c" * 64)
+
+    monkeypatch.setattr(main, "PARSED_DIR", parsed)
+
+    payload = client.get("/graph/summary").json()
+    assert payload["papers"] == 3
+    assert payload["cached_docs"] == 3
+    assert payload["stats"]["internal_edges"] == 2
+    assert payload["stats"]["references_with_arxiv"] >= 1
+    assert payload["foundational"], "应给出基石论文"
+    assert payload["weights"]["pagerank"] == 0.45
+    assert "PageRank" in payload["note"]
+
+
+def test_graph_review_returns_four_sections(client, tmp_path, monkeypatch):
+    parsed = tmp_path / "parsed"
+    _write_parsed(parsed, "2101.00011v1.pdf", "Survey A", 2021, [
+        {"id": "ref-1", "raw": "[1] Attention. arXiv:1706.03762, 2017.", "year": 2017},
+        {"id": "ref-2", "raw": "[2] LayerNorm. arXiv:1607.06450, 2016.", "year": 2016},
+    ], "d" * 64)
+    _write_parsed(parsed, "2101.00012v1.pdf", "Survey B", 2022, [
+        {"id": "ref-1", "raw": "[1] Attention. arXiv:1706.03762, 2017.", "year": 2017},
+    ], "e" * 64)
+    monkeypatch.setattr(main, "PARSED_DIR", parsed)
+
+    response = client.post("/graph/review", json={"topic": "attention", "top_k": 3})
+    assert response.status_code == 200
+
+    outline = response.json()
+    assert outline["papers_selected"]
+    assert len(outline["sections"]) == 4
+    headings = " ".join(section["heading"] for section in outline["sections"])
+    assert "基石" in headings and "演化" in headings
+
+
+def test_graph_review_rejects_empty_library(client, tmp_path, monkeypatch):
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    monkeypatch.setattr(main, "PARSED_DIR", empty)
+
+    summary = client.get("/graph/summary").json()
+    assert summary["papers"] == 0
+
+    response = client.post("/graph/review", json={"topic": "任意主题"})
+    assert response.status_code == 400
+    assert "没有可用于建图" in response.json()["detail"]

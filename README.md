@@ -25,6 +25,7 @@
 | 翻译 | 划词翻译、按章节渐进翻译（读完一节点「继续翻译」）、中英双栏联动滚动；公式与文献保持原文 |
 | 写作 Copilot | 由 idea 生成 Abstract / Introduction / Related Work 框架（参考文献仅取自库内真实论文）、生成 Mermaid / Graphviz / TikZ / Matplotlib 拓扑图脚本、中→英学术翻译 |
 | 数据可视化 | CSV 列画像、统计表、折线 / 柱状 / 三维透视雷达图（SVG）、由数据统计量确定性生成的学术图注 |
+| 引用图谱 | 用 arXiv 编号与参考文献条目建库内引用边（NetworkX），算 PageRank / 入度 / 共被引，输出「基石论文」与图谱驱动的综述骨架（基石文献 → 方法演化 → 库内引用关系 → 研究缺口），全部为确定性规则、可复核 |
 
 ---
 
@@ -87,6 +88,8 @@ ResearchPilot/
 │   ├── translation.py       # 分章节翻译与磁盘缓存
 │   ├── writing.py           # 无幻觉框架、拓扑图脚本、学术翻译
 │   ├── dataviz.py           # CSV 画像、SVG 图表、学术图注
+│   ├── citation_graph.py    # 库内引用边、PageRank、共被引、基石论文与综述骨架
+│   ├── fetch_arxiv_corpus.py # 下载并索引一批 arXiv 论文（建图/评测语料）
 │   ├── bench_long_document.py  # 长文档压测：切块 / 索引 / 分级加载 / 内存
 │   ├── tests/               # 离线接口用例（pytest）
 │   ├── requirements.txt     # 后端依赖清单
@@ -302,6 +305,7 @@ ALLOW_ORIGINS=http://127.0.0.1:5173
 | 翻译 | `POST /translate`、`POST /papers/structure/{id}/translate` | 划词翻译、分章节翻译（带缓存） |
 | 写作 | `POST /writing/outline`、`POST /writing/diagrams`、`POST /writing/translate` | 论文框架、拓扑图脚本、学术英文 |
 | 可视化 | `POST /dataviz/report`、`GET /dataviz/charts/{stem}/{name}` | CSV → 画像 / 表格 / SVG 图表 / 图注 |
+| 引用图谱 | `GET /graph/summary`、`POST /graph/review` | 库内引用图谱（PageRank / 入度 / 共被引）、基石论文、图谱驱动综述骨架 |
 
 ---
 
@@ -320,6 +324,8 @@ ALLOW_ORIGINS=http://127.0.0.1:5173
 11. **长文档入库是同步请求**：541 页实测约 73 秒，期间 HTTP 连接一直占着，没有进度条与取消；后台任务队列还没做。单文档上限 600 页（公网小内存实例通过 `MAX_PAGES` 收紧）。
 12. **标题树在超大文档上会并节**：541 页的书有 181 节，但最大单节达 29 万字符（全书性章节），按节浏览的粒度会变粗；正文检索仍按单元进行，不受影响。
 13. **在线演示实例的内存受限**：Render 免费层 512 MB，`MAX_PAGES=80`；页面在休眠后首访需 30–60 秒冷启动，容器磁盘为临时存储（重启后索引清空，示例论文会自动重灌）。
+14. **引用图谱的质量取决于参考文献切分**：双栏论文的参考文献有时会并成一大块（实测 20 篇语料里 23 条引用来自这种合并块），这类条目只用于连边、不生成单条文献节点；抽不到 arXiv 编号的条目按标题建外部节点，只参与共被引统计。
+15. **基石论文依赖库内规模**：图谱只在"已入库论文"之间建边，库越小结论越不稳；当前 20 篇语料里 Bahdanau（2014）被 4 篇引用、LayerNorm 被 2 篇引用，共被引强对只有 1 组。
 
 ---
 

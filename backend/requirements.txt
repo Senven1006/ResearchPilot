@@ -15,6 +15,10 @@ openai==3.31.0
 chromadb==1.5.9
 numpy==2.5.4
 
+# Citation graph analysis (networkx PageRank needs scipy for sparse linear algebra)
+networkx==3.7
+scipy==1.18.1
+
 # PDF parsing
 pymupdf==1.28.2
 

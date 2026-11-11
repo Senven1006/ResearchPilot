@@ -76,6 +76,9 @@ def is_cjk(char: str) -> bool:
         0x2033, 0x00B1, 0x00D7, 0x00F7,
     ):
         return True
+    # 希腊字母（α β λ ε 等）：Helvetica 没有这些字形，交给宋体渲染
+    if 0x0370 <= code <= 0x03FF:
+        return True
     return False
 
 
@@ -898,7 +901,9 @@ class DocBuilder:
 
     @staticmethod
     def toc_rows() -> int:
-        return 24
+        # 每页 28 行：最坏情况（整页都是一级标题 23pt）也能落在版心内，
+        # 目的是别让三五行目录单独溢出到第三页
+        return 28
 
     def decorate(self):
         total = self.pdf.page_count
