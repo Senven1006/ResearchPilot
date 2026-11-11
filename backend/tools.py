@@ -97,6 +97,17 @@ TOOL_SPECS: list[dict] = [
             ["answer", "query"],
         ),
     },
+    {
+        "name": "library_references",
+        "description": "按写作主题从库内论文挑参考文献并装配成 [R1]..[Rn] 白名单块（无幻觉写作的取文献环节）。",
+        "parameters": _schema(
+            {
+                "idea": {"type": "string", "description": "写作主题 / idea"},
+                "top_k": {"type": "integer", "minimum": 1, "maximum": 10, "default": 3},
+            },
+            ["idea"],
+        ),
+    },
 ]
 
 SPEC_BY_NAME = {spec["name"]: spec for spec in TOOL_SPECS}
@@ -331,6 +342,44 @@ async def tool_verify_answer(answer: str, query: str, top_k: int = 4) -> dict:
     }
 
 
+async def tool_library_references(idea: str, top_k: int = 3) -> dict:
+    """写作环节的"取文献"：从库内论文挑参考文献并装配成 [R1]..[Rn] 白名单块。
+
+    只做检索与装配，不调用模型——生成留给 Agent 主循环，避免工具内部再嵌套一次生成。
+    """
+    main = _main()
+    import writing
+
+    idea = (idea or "").strip()
+    if len(idea) < 4:
+        raise ToolError("idea 至少 4 个字符。")
+
+    top_k = max(1, min(int(top_k), 10))
+    retrieved = await main.hybrid_retrieve(idea, None, top_k=max(top_k * 3, 8))
+    units = retrieved.get("units") or []
+
+    references: list[dict] = []
+    seen: set[str] = set()
+    for unit in units:
+        name = unit.get("filename")
+        if not name or name in seen:
+            continue
+        seen.add(name)
+        references.append(main.library_reference(unit, len(references) + 1))
+        if len(references) >= top_k:
+            break
+
+    if not references:
+        raise ToolError("库内没有与 idea 相关的论文，无法生成参考文献白名单。")
+
+    return {
+        "idea": idea,
+        "references": references,
+        "reference_block": writing.build_reference_block(references),
+        "rule": "写作时只能引用这些编号；越界编号会被写作接口的校验拦下。",
+    }
+
+
 HANDLERS: dict[str, Callable[..., Awaitable[dict]]] = {
     "search_library": tool_search_library,
     "list_papers": tool_list_papers,
@@ -338,6 +387,7 @@ HANDLERS: dict[str, Callable[..., Awaitable[dict]]] = {
     "find_citation_path": tool_find_citation_path,
     "lookup_arxiv": tool_lookup_arxiv,
     "verify_answer": tool_verify_answer,
+    "library_references": tool_library_references,
 }
 
 

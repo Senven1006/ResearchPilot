@@ -47,10 +47,11 @@ def _write_parsed(directory: Path, filename: str, title: str, references: list[d
 def test_tool_registry_exposes_json_schemas(client):
     payload = client.get("/tools").json()
 
-    assert payload["count"] >= 6
+    assert payload["count"] >= 7
     names = {spec["name"] for spec in payload["tools"]}
     assert {"search_library", "list_papers", "citation_graph",
-            "find_citation_path", "lookup_arxiv", "verify_answer"} <= names
+            "find_citation_path", "lookup_arxiv", "verify_answer",
+            "library_references"} <= names
 
     for spec in payload["tools"]:
         assert spec["description"], spec["name"]
@@ -230,3 +231,24 @@ def test_tool_verify_answer_numeric_only(client, offline_models, pdf_bytes):
     assert result["mode"] == "numeric_only", "哈希嵌入后端只做数字核验"
     assert result["evidence_count"] >= 1
     assert result["verification"]["claims"]
+
+def test_tool_library_references_wraps_writing(client, pdf_bytes):
+    """写作环节的取文献也应在工具里可用：返回 [R1].. 白名单块，且只取库内论文。"""
+    client.post("/papers/index",
+                files={"file": ("attention.pdf", pdf_bytes, "application/pdf")})
+
+    response = client.post("/tools/library_references", json={"arguments": {
+        "idea": "稀疏注意力降低长文本推理成本",
+        "top_k": 2,
+    }})
+    assert response.status_code == 200
+
+    result = response.json()["result"]
+    assert result["references"], "应取到库内参考文献"
+    first = result["references"][0]
+    assert first["filename"] == "attention.pdf"
+    assert result["reference_block"].startswith("[R1]")
+    assert "越界" in result["rule"]
+
+    too_short = client.post("/tools/library_references", json={"arguments": {"idea": "ab"}})
+    assert too_short.status_code == 400

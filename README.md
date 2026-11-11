@@ -26,7 +26,7 @@
 | 写作 Copilot | 由 idea 生成 Abstract / Introduction / Related Work 框架（参考文献仅取自库内真实论文）、生成 Mermaid / Graphviz / TikZ / Matplotlib 拓扑图脚本、中→英学术翻译 |
 | 数据可视化 | CSV 列画像、统计表、折线 / 柱状 / 三维透视雷达图（SVG）、由数据统计量确定性生成的学术图注 |
 | 引用图谱 | 用 arXiv 编号与参考文献条目建库内引用边（NetworkX），算 PageRank / 入度 / 共被引，输出「基石论文」与图谱驱动的综述骨架（基石文献 → 方法演化 → 库内引用关系 → 研究缺口），全部为确定性规则、可复核 |
-| 工具注册表与 Agent | 把检索、图谱查询、arXiv 元数据、断言核验封装成 6 个带 JSON Schema 的工具（`GET /tools`），模型可自选调用（`POST /agent/ask`，最多 6 步，返回每一步的工具、参数与观察） |
+| 工具注册表与 Agent | 把检索、图谱查询、arXiv 元数据、断言核验封装成 7 个带 JSON Schema 的工具（`GET /tools`），模型可自选调用（`POST /agent/ask`，最多 6 步，返回每一步的工具、参数与观察） |
 
 ---
 
@@ -212,7 +212,7 @@ npm run dev                     # 默认 http://localhost:5173
 ```bash
 cd ResearchPilot/backend
 pip install -r requirements-dev.txt      # 含 pytest
-python -m pytest                         # 40 个用例，约 3.6 秒
+python -m pytest                         # 41 个用例，约 3.7 秒
 ```
 
 覆盖范围：健康检查与降级后端、结构化解析（标题树 / 参考文献切分）、入库与原件留档、内容级去重、问答证据与断言核验（含刻意答错数字被标出）、划词翻译与缓存、分章节翻译的缓存命中、CSV 图表生成、非 CSV 拒绝、库内文献回填、越界引用检测、鉴权开关（无 token / 错 token / header / `?token=` 四种情况）、`/api` 前缀改写、演示数据生成、引用图谱（建边/PageRank/共被引/综述骨架）、工具注册表与 Agent 循环（含参数校验、arXiv 缓存、步数上限）。
