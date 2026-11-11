@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import os
+import re
 import sys
 import time
 from pathlib import Path
@@ -52,7 +53,18 @@ UA = "ResearchPilot/0.6 (academic demo; contact: repo owner)"
 
 
 def download(arxiv_id: str, target_dir: Path, client: httpx.Client) -> Path | None:
-    target = target_dir / f"{arxiv_id}v1.pdf"
+    """下载单篇。
+
+    文件名规则：`1706.03762` → `1706.03762v1.pdf`（默认最新版按 v1 命名），
+    `1706.03762v7` → `1706.03762v7.pdf`（显式带版本时按传入形式保存），
+    这样入库时能从文件名解析出 arXiv 编号与版本。
+    """
+    if re.search(r"v\d+$", arxiv_id):
+        filename = f"{arxiv_id}.pdf"
+    else:
+        filename = f"{arxiv_id}v1.pdf"
+
+    target = target_dir / filename
     if target.exists() and target.stat().st_size > 20_000:
         print(f"  已存在，跳过：{target.name}（{target.stat().st_size / 1024:.0f} KB）")
         return target
@@ -103,7 +115,8 @@ def main_entry() -> int:
 
     ids = [item.strip() for item in args.ids.split(",") if item.strip()]
     if args.default:
-        ids = DEFAULT_IDS
+        # --default 与 --ids 可以叠加：默认 20 篇 + 额外指定（比如把被引网络的中心论文也放进来）
+        ids = DEFAULT_IDS + [item for item in ids if item not in DEFAULT_IDS]
     if not ids:
         print("请用 --ids 或 --default 指定论文")
         return 2

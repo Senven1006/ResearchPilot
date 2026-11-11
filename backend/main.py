@@ -21,6 +21,7 @@ from pydantic import BaseModel, Field
 import citation_graph
 import dataviz
 import embedding
+import tools
 from demo_seed import DEMO_FILENAME, build_demo_pdf
 from pdf_structure import StructureParser
 from translation import (
@@ -2088,6 +2089,48 @@ async def dataviz_chart(stem: str, name: str):
         raise HTTPException(status_code=404, detail="图表不存在。")
 
     return FileResponse(path, media_type="image/svg+xml")
+
+
+# ------------------------------------------------------------ 工具注册表与 Agent
+
+
+class ToolInvokeRequest(BaseModel):
+    arguments: dict = Field(default_factory=dict)
+
+
+class AgentAskRequest(BaseModel):
+    question: str = Field(min_length=1)
+    max_steps: int = Field(default=4, ge=1, le=6)
+    model: str = ""
+
+
+@app.get("/tools")
+def list_tool_registry():
+    """列出工具及其实参 JSON Schema；模型与外部调用方都据此决定怎么调。"""
+    specs = tools.list_tools()
+    return {
+        "count": len(specs),
+        "tools": specs,
+        "protocol": "POST /tools/{name}，body 为 {\"arguments\": {...}}；"
+                    "模型自选调用的有界循环见 POST /agent/ask。",
+    }
+
+
+@app.post("/tools/{name}")
+async def invoke_tool(name: str, request: ToolInvokeRequest):
+    try:
+        return await tools.invoke(name, request.arguments)
+    except tools.ToolError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/agent/ask")
+async def agent_ask(request: AgentAskRequest):
+    """模型自选工具回答：最多 max_steps 步，返回每一步的调用与观察，便于复核。"""
+    try:
+        return await tools.run_agent(request.question, request.max_steps, request.model)
+    except tools.ToolError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 # ------------------------------------------------------------ 引用图谱与综述

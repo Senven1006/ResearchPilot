@@ -1,0 +1,36 @@
+{"id": "q01", "paper": "1706.03762v7.pdf", "question": "训练这个模型用了多少张 GPU？", "keyword": "P100", "note": "Attention 的训练硬件"}
+{"id": "q02", "paper": "1706.03762v7.pdf", "question": "注意力头数 h 是多少？", "keyword": "heads", "note": "多头注意力配置"}
+{"id": "q03", "paper": "1706.03762v7.pdf", "question": "模型维度 d_model 取多大？", "keyword": "d_?model", "note": "模型宽度"}
+{"id": "q04", "paper": "1706.03762v7.pdf", "question": "训练时 dropout 的比例是多少？", "keyword": "dropout", "note": "正则化设置"}
+{"id": "q05", "paper": "1706.03762v7.pdf", "question": "英德翻译任务上 BLEU 是多少？", "keyword": "BLEU", "note": "主要结果"}
+{"id": "q06", "paper": "1607.06450v1.pdf", "question": "这篇论文提出的归一化方法叫什么？", "keyword": "layer normalization", "note": "方法名"}
+{"id": "q07", "paper": "1607.06450v1.pdf", "question": "为什么该方法不依赖 batch 大小？", "keyword": "batch", "note": "动机"}
+{"id": "q08", "paper": "1607.06450v1.pdf", "question": "实验中用了哪个优化器？", "keyword": "Adam", "note": "训练细节"}
+{"id": "q09", "paper": "1409.0473v1.pdf", "question": "论文提出的模型叫什么名字？", "keyword": "RNNsearch", "note": "模型名"}
+{"id": "q10", "paper": "1409.0473v1.pdf", "question": "在哪个语言对上做了评测？", "keyword": "English-French|French", "note": "实验设置"}
+{"id": "q11", "paper": "1409.0473v1.pdf", "question": "模型如何对齐源语言和目标语言？", "keyword": "align", "note": "注意力对齐"}
+{"id": "q12", "paper": "1609.08144v1.pdf", "question": "系统用了多少层编码器和解码器？", "keyword": "layers", "note": "模型深度"}
+{"id": "q13", "paper": "1609.08144v1.pdf", "question": "是否使用了 wordpiece 切分？", "keyword": "wordpiece", "note": "子词"}
+{"id": "q14", "paper": "1609.08144v1.pdf", "question": "英法翻译上的 BLEU 是多少？", "keyword": "BLEU", "note": "结果"}
+{"id": "q15", "paper": "1705.03122v1.pdf", "question": "卷积序列模型用了什么门控单元？", "keyword": "gated linear", "note": "GLU"}
+{"id": "q16", "paper": "1705.03122v1.pdf", "question": "模型如何编码位置信息？", "keyword": "position", "note": "位置编码"}
+{"id": "q17", "paper": "1508.04025v1.pdf", "question": "论文比较了哪两类注意力机制？", "keyword": "global|local", "note": "注意力类型"}
+{"id": "q18", "paper": "1508.07909v1.pdf", "question": "子词切分使用的方法叫什么？", "keyword": "byte pair|BPE", "note": "BPE"}
+{"id": "q19", "paper": "1508.07909v1.pdf", "question": "子词合并操作执行了多少次？", "keyword": "merge", "note": "合并次数"}
+{"id": "q20", "paper": "1701.06538v1.pdf", "question": "这个稀疏门控模型的参数量有多大？", "keyword": "parameters", "note": "模型规模"}
+{"id": "q21", "paper": "1701.06538v1.pdf", "question": "门控网络如何选择专家？", "keyword": "gating", "note": "门控机制"}
+{"id": "q22", "paper": "1601.06733v1.pdf", "question": "论文提出了什么记忆结构？", "keyword": "memory", "note": "LSTMN"}
+{"id": "q23", "paper": "1512.00567v1.pdf", "question": "论文的核心思想是什么？", "keyword": "factoriz", "note": "因子分解卷积"}
+{"id": "q24", "paper": "1512.00567v1.pdf", "question": "训练中用了什么正则化手段？", "keyword": "batch normaliz|label smoothing", "note": "正则化"}
+{"id": "q25", "paper": "1610.02357v1.pdf", "question": "深度可分离卷积由哪两步组成？", "keyword": "depthwise|pointwise", "note": "Xception"}
+{"id": "q26", "paper": "1610.02357v1.pdf", "question": "该模型与 Inception 模块是什么关系？", "keyword": "Inception", "note": "与 Inception 对比"}
+{"id": "q27", "paper": "1406.1078v1.pdf", "question": "论文比较了哪两种循环单元？", "keyword": "GRU|LSTM", "note": "GRU vs LSTM"}
+{"id": "q28", "paper": "1412.3555v1.pdf", "question": "在哪些任务上比较了 GRU 和 LSTM？", "keyword": "task", "note": "评测任务"}
+{"id": "q29", "paper": "1308.0850v1.pdf", "question": "论文用什么网络生成文本序列？", "keyword": "recurrent|RNN", "note": "序列生成"}
+{"id": "q30", "paper": "1308.0850v1.pdf", "question": "这篇论文除了文本，还生成了哪类序列数据？", "keyword": "handwriting", "note": "手写序列生成"}
+{"id": "q31", "paper": "1602.02410v1.pdf", "question": "论文报告的语言模型困惑度是多少？", "keyword": "perplexity", "note": "困惑度"}
+{"id": "q32", "paper": "1610.10099v1.pdf", "question": "该模型的复杂度与序列长度是什么关系？", "keyword": "linear", "note": "线性时间"}
+{"id": "q33", "paper": "1703.10722v1.pdf", "question": "论文对 LSTM 做了什么因子分解？", "keyword": "factoriz", "note": "因子分解"}
+{"id": "q34", "paper": "1703.03130v1.pdf", "question": "句子表示是如何聚合的？", "keyword": "attention", "note": "自注意力句向量"}
+{"id": "q35", "paper": "1606.04199v1.pdf", "question": "快速前向连接的作用是什么？", "keyword": "fast-forward|residual", "note": "跳连"}
+{"id": "q36", "paper": "1703.03906v1.pdf", "question": "论文系统比较了哪些翻译架构？", "keyword": "architect", "note": "架构对比"}

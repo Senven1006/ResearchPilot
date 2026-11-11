@@ -1,0 +1,1994 @@
+{
+  "generated_at": "2026-11-11 18:46",
+  "corpus": "D:\\ResearchPilot\\data\\graphcorpus",
+  "embedding_backend": "hash",
+  "gold_total": 36,
+  "gold_verifiable": 36,
+  "unverifiable": [],
+  "recall_at": {
+    "1": 0.722,
+    "3": 0.889,
+    "5": 0.972
+  },
+  "mrr": 0.822,
+  "details": [
+    {
+      "id": "q01",
+      "question": "训练这个模型用了多少张 GPU？",
+      "paper": "1706.03762v7.pdf",
+      "gold_pages": [
+        2,
+        7,
+        8
+      ],
+      "first_hit_rank": 1,
+      "evidence_pages": [
+        7,
+        2,
+        8,
+        8,
+        1
+      ]
+    },
+    {
+      "id": "q02",
+      "question": "注意力头数 h 是多少？",
+      "paper": "1706.03762v7.pdf",
+      "gold_pages": [
+        5,
+        7,
+        9,
+        10,
+        13,
+        14,
+        15
+      ],
+      "first_hit_rank": 3,
+      "evidence_pages": [
+        4,
+        4,
+        5,
+        5,
+        8
+      ]
+    },
+    {
+      "id": "q03",
+      "question": "模型维度 d_model 取多大？",
+      "paper": "1706.03762v7.pdf",
+      "gold_pages": [
+        3,
+        4,
+        5,
+        6,
+        9
+      ],
+      "first_hit_rank": 1,
+      "evidence_pages": [
+        3,
+        5,
+        3,
+        5,
+        8
+      ]
+    },
+    {
+      "id": "q04",
+      "question": "训练时 dropout 的比例是多少？",
+      "paper": "1706.03762v7.pdf",
+      "gold_pages": [
+        8,
+        9,
+        10,
+        12
+      ],
+      "first_hit_rank": 1,
+      "evidence_pages": [
+        8,
+        8,
+        12,
+        8,
+        9
+      ]
+    },
+    {
+      "id": "q05",
+      "question": "英德翻译任务上 BLEU 是多少？",
+      "paper": "1706.03762v7.pdf",
+      "gold_pages": [
+        1,
+        8,
+        9
+      ],
+      "first_hit_rank": 1,
+      "evidence_pages": [
+        9,
+        1,
+        8,
+        9,
+        9
+      ]
+    },
+    {
+      "id": "q06",
+      "question": "这篇论文提出的归一化方法叫什么？",
+      "paper": "1607.06450v1.pdf",
+      "gold_pages": [
+        1,
+        2,
+        3,
+        4,
+        6,
+        7,
+        8,
+        9,
+        10,
+        13,
+        14
+      ],
+      "first_hit_rank": 1,
+      "evidence_pages": [
+        14,
+        8,
+        14,
+        11,
+        14
+      ]
+    },
+    {
+      "id": "q07",
+      "question": "为什么该方法不依赖 batch 大小？",
+      "paper": "1607.06450v1.pdf",
+      "gold_pages": [
+        1,
+        2,
+        3,
+        4,
+        6,
+        7,
+        9,
+        10,
+        11,
+        14
+      ],
+      "first_hit_rank": 1,
+      "evidence_pages": [
+        11,
+        11,
+        1,
+        11,
+        10
+      ]
+    },
+    {
+      "id": "q08",
+      "question": "实验中用了哪个优化器？",
+      "paper": "1607.06450v1.pdf",
+      "gold_pages": [
+        7,
+        9,
+        10,
+        11
+      ],
+      "first_hit_rank": 1,
+      "evidence_pages": [
+        9,
+        6,
+        11,
+        13,
+        12
+      ]
+    },
+    {
+      "id": "q09",
+      "question": "论文提出的模型叫什么名字？",
+      "paper": "1409.0473v1.pdf",
+      "gold_pages": [
+        5,
+        6,
+        7,
+        8,
+        9,
+        13,
+        14,
+        15
+      ],
+      "first_hit_rank": 4,
+      "evidence_pages": [
+        4,
+        11,
+        3,
+        5,
+        5
+      ]
+    },
+    {
+      "id": "q10",
+      "question": "在哪个语言对上做了评测？",
+      "paper": "1409.0473v1.pdf",
+      "gold_pages": [
+        1,
+        2,
+        4,
+        6,
+        7,
+        9
+      ],
+      "first_hit_rank": 1,
+      "evidence_pages": [
+        2,
+        14,
+        10,
+        9,
+        10
+      ]
+    },
+    {
+      "id": "q11",
+      "question": "模型如何对齐源语言和目标语言？",
+      "paper": "1409.0473v1.pdf",
+      "gold_pages": [
+        1,
+        2,
+        3,
+        4,
+        6,
+        7,
+        8,
+        9,
+        11,
+        12,
+        13,
+        14
+      ],
+      "first_hit_rank": 1,
+      "evidence_pages": [
+        12,
+        13,
+        11,
+        5,
+        11
+      ]
+    },
+    {
+      "id": "q12",
+      "question": "系统用了多少层编码器和解码器？",
+      "paper": "1609.08144v1.pdf",
+      "gold_pages": [
+        1,
+        2,
+        4,
+        5,
+        6,
+        9,
+        14,
+        16,
+        18
+      ],
+      "first_hit_rank": 1,
+      "evidence_pages": [
+        5,
+        5,
+        5,
+        6,
+        6
+      ]
+    },
+    {
+      "id": "q13",
+      "question": "是否使用了 wordpiece 切分？",
+      "paper": "1609.08144v1.pdf",
+      "gold_pages": [
+        1,
+        2,
+        7,
+        14,
+        16,
+        17,
+        18,
+        20
+      ],
+      "first_hit_rank": 1,
+      "evidence_pages": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ]
+    },
+    {
+      "id": "q14",
+      "question": "英法翻译上的 BLEU 是多少？",
+      "paper": "1609.08144v1.pdf",
+      "gold_pages": [
+        1,
+        2,
+        3,
+        7,
+        8,
+        9,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18
+      ],
+      "first_hit_rank": 1,
+      "evidence_pages": [
+        13,
+        13,
+        18,
+        12,
+        13
+      ]
+    },
+    {
+      "id": "q15",
+      "question": "卷积序列模型用了什么门控单元？",
+      "paper": "1705.03122v1.pdf",
+      "gold_pages": [
+        1,
+        2,
+        3,
+        4,
+        10
+      ],
+      "first_hit_rank": 1,
+      "evidence_pages": [
+        10,
+        1,
+        1,
+        13,
+        13
+      ]
+    },
+    {
+      "id": "q16",
+      "question": "模型如何编码位置信息？",
+      "paper": "1705.03122v1.pdf",
+      "gold_pages": [
+        2,
+        7,
+        8,
+        9,
+        14
+      ],
+      "first_hit_rank": null,
+      "evidence_pages": [
+        1,
+        6,
+        10,
+        6,
+        5
+      ]
+    },
+    {
+      "id": "q17",
+      "question": "论文比较了哪两类注意力机制？",
+      "paper": "1508.04025v1.pdf",
+      "gold_pages": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11
+      ],
+      "first_hit_rank": 1,
+      "evidence_pages": [
+        4,
+        4,
+        3,
+        4,
+        10
+      ]
+    },
+    {
+      "id": "q18",
+      "question": "子词切分使用的方法叫什么？",
+      "paper": "1508.07909v1.pdf",
+      "gold_pages": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "first_hit_rank": 2,
+      "evidence_pages": [
+        11,
+        3,
+        9,
+        3,
+        10
+      ]
+    },
+    {
+      "id": "q19",
+      "question": "子词合并操作执行了多少次？",
+      "paper": "1508.07909v1.pdf",
+      "gold_pages": [
+        3,
+        4,
+        5
+      ],
+      "first_hit_rank": 1,
+      "evidence_pages": [
+        4,
+        9,
+        5,
+        9,
+        9
+      ]
+    },
+    {
+      "id": "q20",
+      "question": "这个稀疏门控模型的参数量有多大？",
+      "paper": "1701.06538v1.pdf",
+      "gold_pages": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        14,
+        16,
+        17
+      ],
+      "first_hit_rank": 1,
+      "evidence_pages": [
+        6,
+        15,
+        7,
+        8,
+        6
+      ]
+    },
+    {
+      "id": "q21",
+      "question": "门控网络如何选择专家？",
+      "paper": "1701.06538v1.pdf",
+      "gold_pages": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        10,
+        13,
+        14,
+        17,
+        18,
+        19
+      ],
+      "first_hit_rank": 1,
+      "evidence_pages": [
+        19,
+        19,
+        4,
+        19,
+        18
+      ]
+    },
+    {
+      "id": "q22",
+      "question": "论文提出了什么记忆结构？",
+      "paper": "1601.06733v1.pdf",
+      "gold_pages": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11
+      ],
+      "first_hit_rank": 1,
+      "evidence_pages": [
+        11,
+        9,
+        7,
+        4,
+        11
+      ]
+    },
+    {
+      "id": "q23",
+      "question": "论文的核心思想是什么？",
+      "paper": "1512.00567v1.pdf",
+      "gold_pages": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        8,
+        9
+      ],
+      "first_hit_rank": 1,
+      "evidence_pages": [
+        6,
+        3,
+        6,
+        3,
+        10
+      ]
+    },
+    {
+      "id": "q24",
+      "question": "训练中用了什么正则化手段？",
+      "paper": "1512.00567v1.pdf",
+      "gold_pages": [
+        5,
+        6,
+        8,
+        9
+      ],
+      "first_hit_rank": 1,
+      "evidence_pages": [
+        6,
+        1,
+        8,
+        7,
+        8
+      ]
+    },
+    {
+      "id": "q25",
+      "question": "深度可分离卷积由哪两步组成？",
+      "paper": "1610.02357v1.pdf",
+      "gold_pages": [
+        1,
+        2,
+        3,
+        6,
+        7
+      ],
+      "first_hit_rank": 1,
+      "evidence_pages": [
+        2,
+        2,
+        2,
+        3,
+        3
+      ]
+    },
+    {
+      "id": "q26",
+      "question": "该模型与 Inception 模块是什么关系？",
+      "paper": "1610.02357v1.pdf",
+      "gold_pages": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "first_hit_rank": 1,
+      "evidence_pages": [
+        1,
+        1,
+        6,
+        5,
+        2
+      ]
+    },
+    {
+      "id": "q27",
+      "question": "论文比较了哪两种循环单元？",
+      "paper": "1406.1078v1.pdf",
+      "gold_pages": [
+        2,
+        3
+      ],
+      "first_hit_rank": 2,
+      "evidence_pages": [
+        5,
+        2,
+        2,
+        12,
+        8
+      ]
+    },
+    {
+      "id": "q28",
+      "question": "在哪些任务上比较了 GRU 和 LSTM？",
+      "paper": "1412.3555v1.pdf",
+      "gold_pages": [
+        1,
+        2,
+        5,
+        6,
+        7
+      ],
+      "first_hit_rank": 2,
+      "evidence_pages": [
+        4,
+        5,
+        4,
+        7,
+        4
+      ]
+    },
+    {
+      "id": "q29",
+      "question": "论文用什么网络生成文本序列？",
+      "paper": "1308.0850v1.pdf",
+      "gold_pages": [
+        1,
+        2,
+        3,
+        4,
+        8,
+        9,
+        10,
+        19,
+        24,
+        34,
+        41,
+        42,
+        43
+      ],
+      "first_hit_rank": 1,
+      "evidence_pages": [
+        3,
+        42,
+        12,
+        7,
+        14
+      ]
+    },
+    {
+      "id": "q30",
+      "question": "这篇论文除了文本，还生成了哪类序列数据？",
+      "paper": "1308.0850v1.pdf",
+      "gold_pages": [
+        1,
+        2,
+        18,
+        19,
+        21,
+        22,
+        24,
+        25,
+        26,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        41,
+        42
+      ],
+      "first_hit_rank": 1,
+      "evidence_pages": [
+        32,
+        10,
+        43,
+        21,
+        21
+      ]
+    },
+    {
+      "id": "q31",
+      "question": "论文报告的语言模型困惑度是多少？",
+      "paper": "1602.02410v1.pdf",
+      "gold_pages": [
+        1,
+        2,
+        5,
+        6,
+        7,
+        8
+      ],
+      "first_hit_rank": 4,
+      "evidence_pages": [
+        10,
+        10,
+        10,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "q32",
+      "question": "该模型的复杂度与序列长度是什么关系？",
+      "paper": "1610.10099v1.pdf",
+      "gold_pages": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        7
+      ],
+      "first_hit_rank": 2,
+      "evidence_pages": [
+        6,
+        3,
+        3,
+        8,
+        2
+      ]
+    },
+    {
+      "id": "q33",
+      "question": "论文对 LSTM 做了什么因子分解？",
+      "paper": "1703.10722v1.pdf",
+      "gold_pages": [
+        1,
+        2,
+        3,
+        6
+      ],
+      "first_hit_rank": 1,
+      "evidence_pages": [
+        2,
+        1,
+        3,
+        2,
+        1
+      ]
+    },
+    {
+      "id": "q34",
+      "question": "句子表示是如何聚合的？",
+      "paper": "1703.03130v1.pdf",
+      "gold_pages": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        15
+      ],
+      "first_hit_rank": 1,
+      "evidence_pages": [
+        10,
+        11,
+        3,
+        4,
+        12
+      ]
+    },
+    {
+      "id": "q35",
+      "question": "快速前向连接的作用是什么？",
+      "paper": "1606.04199v1.pdf",
+      "gold_pages": [
+        1,
+        2,
+        3,
+        11,
+        12
+      ],
+      "first_hit_rank": 2,
+      "evidence_pages": [
+        8,
+        11,
+        9,
+        5,
+        6
+      ]
+    },
+    {
+      "id": "q36",
+      "question": "论文系统比较了哪些翻译架构？",
+      "paper": "1703.03906v1.pdf",
+      "gold_pages": [
+        1,
+        2,
+        3,
+        4,
+        7,
+        8
+      ],
+      "first_hit_rank": 4,
+      "evidence_pages": [
+        5,
+        5,
+        6,
+        2,
+        5
+      ]
+    }
+  ],
+  "citation": {
+    "answered": 36,
+    "model": "deepseek",
+    "verification_mode": "numeric_only",
+    "citation_valid_rate": 1.0,
+    "citation_grounded_rate": 0.722,
+    "citation_precision": 0.755,
+    "citations_total": 102,
+    "citations_grounded": 77,
+    "supported_rate": 0.023,
+    "per_item": [
+      {
+        "id": "q01",
+        "model": "deepseek-flash",
+        "cited": [
+          1,
+          1
+        ],
+        "citation_valid": true,
+        "citation_grounded": true,
+        "gold_pages": [
+          2,
+          7,
+          8
+        ],
+        "cited_pages": [
+          7,
+          7
+        ],
+        "answer_chars": 175,
+        "verdicts": [
+          "no_citation",
+          "no_citation"
+        ]
+      },
+      {
+        "id": "q02",
+        "model": "deepseek-flash",
+        "cited": [
+          1,
+          1,
+          1
+        ],
+        "citation_valid": true,
+        "citation_grounded": false,
+        "gold_pages": [
+          5,
+          7,
+          9,
+          10,
+          13,
+          14,
+          15
+        ],
+        "cited_pages": [
+          4,
+          4,
+          4
+        ],
+        "answer_chars": 194,
+        "verdicts": [
+          "unverified",
+          "unverified",
+          "unverified"
+        ]
+      },
+      {
+        "id": "q03",
+        "model": "deepseek-flash",
+        "cited": [
+          1,
+          1,
+          1
+        ],
+        "citation_valid": true,
+        "citation_grounded": true,
+        "gold_pages": [
+          3,
+          4,
+          5,
+          6,
+          9
+        ],
+        "cited_pages": [
+          3,
+          3,
+          3
+        ],
+        "answer_chars": 243,
+        "verdicts": [
+          "no_citation",
+          "unverified",
+          "unverified",
+          "unverified"
+        ]
+      },
+      {
+        "id": "q04",
+        "model": "deepseek-flash",
+        "cited": [
+          1,
+          1
+        ],
+        "citation_valid": true,
+        "citation_grounded": true,
+        "gold_pages": [
+          8,
+          9,
+          10,
+          12
+        ],
+        "cited_pages": [
+          8,
+          8
+        ],
+        "answer_chars": 208,
+        "verdicts": [
+          "no_citation",
+          "unverified",
+          "no_citation",
+          "unverified"
+        ]
+      },
+      {
+        "id": "q05",
+        "model": "deepseek-flash",
+        "cited": [
+          1,
+          1,
+          1
+        ],
+        "citation_valid": true,
+        "citation_grounded": true,
+        "gold_pages": [
+          1,
+          8,
+          9
+        ],
+        "cited_pages": [
+          9,
+          9,
+          9
+        ],
+        "answer_chars": 173,
+        "verdicts": [
+          "no_citation",
+          "no_citation",
+          "unverified"
+        ]
+      },
+      {
+        "id": "q06",
+        "model": "deepseek-flash",
+        "cited": [
+          1,
+          1,
+          1
+        ],
+        "citation_valid": true,
+        "citation_grounded": true,
+        "gold_pages": [
+          1,
+          2,
+          3,
+          4,
+          6,
+          7,
+          8,
+          9,
+          10,
+          13,
+          14
+        ],
+        "cited_pages": [
+          14,
+          14,
+          14
+        ],
+        "answer_chars": 180,
+        "verdicts": [
+          "unverified",
+          "unverified",
+          "unverified"
+        ]
+      },
+      {
+        "id": "q07",
+        "model": "deepseek-flash",
+        "cited": [
+          1,
+          1,
+          1
+        ],
+        "citation_valid": true,
+        "citation_grounded": true,
+        "gold_pages": [
+          1,
+          2,
+          3,
+          4,
+          6,
+          7,
+          9,
+          10,
+          11,
+          14
+        ],
+        "cited_pages": [
+          11,
+          11,
+          11
+        ],
+        "answer_chars": 143,
+        "verdicts": [
+          "unverified",
+          "unverified",
+          "unverified"
+        ]
+      },
+      {
+        "id": "q08",
+        "model": "deepseek-flash",
+        "cited": [
+          1,
+          1,
+          1
+        ],
+        "citation_valid": true,
+        "citation_grounded": true,
+        "gold_pages": [
+          7,
+          9,
+          10,
+          11
+        ],
+        "cited_pages": [
+          9,
+          9,
+          9
+        ],
+        "answer_chars": 151,
+        "verdicts": [
+          "no_citation",
+          "no_citation",
+          "no_citation"
+        ]
+      },
+      {
+        "id": "q09",
+        "model": "deepseek-flash",
+        "cited": [
+          1,
+          1
+        ],
+        "citation_valid": true,
+        "citation_grounded": false,
+        "gold_pages": [
+          5,
+          6,
+          7,
+          8,
+          9,
+          13,
+          14,
+          15
+        ],
+        "cited_pages": [
+          4,
+          4
+        ],
+        "answer_chars": 166,
+        "verdicts": [
+          "unverified",
+          "no_citation",
+          "unverified"
+        ]
+      },
+      {
+        "id": "q10",
+        "model": "deepseek-flash",
+        "cited": [
+          1,
+          1
+        ],
+        "citation_valid": true,
+        "citation_grounded": true,
+        "gold_pages": [
+          1,
+          2,
+          4,
+          6,
+          7,
+          9
+        ],
+        "cited_pages": [
+          2,
+          2
+        ],
+        "answer_chars": 108,
+        "verdicts": [
+          "no_citation",
+          "unverified"
+        ]
+      },
+      {
+        "id": "q11",
+        "model": "deepseek-flash",
+        "cited": [
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "citation_valid": true,
+        "citation_grounded": true,
+        "gold_pages": [
+          1,
+          2,
+          3,
+          4,
+          6,
+          7,
+          8,
+          9,
+          11,
+          12,
+          13,
+          14
+        ],
+        "cited_pages": [
+          12,
+          12,
+          12,
+          12,
+          12
+        ],
+        "answer_chars": 348,
+        "verdicts": [
+          "no_citation",
+          "no_citation",
+          "no_citation",
+          "unverified",
+          "unverified",
+          "unverified"
+        ]
+      },
+      {
+        "id": "q12",
+        "model": "deepseek-flash",
+        "cited": [
+          1,
+          1
+        ],
+        "citation_valid": true,
+        "citation_grounded": true,
+        "gold_pages": [
+          1,
+          2,
+          4,
+          5,
+          6,
+          9,
+          14,
+          16,
+          18
+        ],
+        "cited_pages": [
+          5,
+          5
+        ],
+        "answer_chars": 155,
+        "verdicts": [
+          "no_citation",
+          "no_citation"
+        ]
+      },
+      {
+        "id": "q13",
+        "model": "deepseek-flash",
+        "cited": [
+          1,
+          1,
+          1
+        ],
+        "citation_valid": true,
+        "citation_grounded": true,
+        "gold_pages": [
+          1,
+          2,
+          7,
+          14,
+          16,
+          17,
+          18,
+          20
+        ],
+        "cited_pages": [
+          7,
+          7,
+          7
+        ],
+        "answer_chars": 235,
+        "verdicts": [
+          "no_citation",
+          "no_citation",
+          "no_citation",
+          "unverified"
+        ]
+      },
+      {
+        "id": "q14",
+        "model": "deepseek-flash",
+        "cited": [
+          1,
+          1,
+          1
+        ],
+        "citation_valid": true,
+        "citation_grounded": true,
+        "gold_pages": [
+          1,
+          2,
+          3,
+          7,
+          8,
+          9,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18
+        ],
+        "cited_pages": [
+          13,
+          13,
+          13
+        ],
+        "answer_chars": 217,
+        "verdicts": [
+          "no_citation",
+          "unverified",
+          "unverified",
+          "unverified"
+        ]
+      },
+      {
+        "id": "q15",
+        "model": "deepseek-flash",
+        "cited": [
+          1,
+          1,
+          1
+        ],
+        "citation_valid": true,
+        "citation_grounded": true,
+        "gold_pages": [
+          1,
+          2,
+          3,
+          4,
+          10
+        ],
+        "cited_pages": [
+          10,
+          10,
+          10
+        ],
+        "answer_chars": 196,
+        "verdicts": [
+          "unverified",
+          "no_citation",
+          "unverified",
+          "unverified"
+        ]
+      },
+      {
+        "id": "q16",
+        "model": "deepseek-flash",
+        "cited": [
+          1,
+          1
+        ],
+        "citation_valid": true,
+        "citation_grounded": false,
+        "gold_pages": [
+          2,
+          7,
+          8,
+          9,
+          14
+        ],
+        "cited_pages": [
+          1,
+          1
+        ],
+        "answer_chars": 211,
+        "verdicts": [
+          "unverified",
+          "no_citation",
+          "unverified"
+        ]
+      },
+      {
+        "id": "q17",
+        "model": "deepseek-flash",
+        "cited": [
+          1,
+          1,
+          1
+        ],
+        "citation_valid": true,
+        "citation_grounded": true,
+        "gold_pages": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ],
+        "cited_pages": [
+          4,
+          4,
+          4
+        ],
+        "answer_chars": 203,
+        "verdicts": [
+          "unverified",
+          "unverified",
+          "unverified"
+        ]
+      },
+      {
+        "id": "q18",
+        "model": "deepseek-flash",
+        "cited": [
+          1,
+          1
+        ],
+        "citation_valid": true,
+        "citation_grounded": false,
+        "gold_pages": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9
+        ],
+        "cited_pages": [
+          11,
+          11
+        ],
+        "answer_chars": 122,
+        "verdicts": [
+          "no_citation",
+          "no_citation",
+          "no_citation"
+        ]
+      },
+      {
+        "id": "q19",
+        "model": "deepseek-flash",
+        "cited": [
+          1,
+          1
+        ],
+        "citation_valid": true,
+        "citation_grounded": true,
+        "gold_pages": [
+          3,
+          4,
+          5
+        ],
+        "cited_pages": [
+          4,
+          4
+        ],
+        "answer_chars": 134,
+        "verdicts": [
+          "unverified",
+          "unverified"
+        ]
+      },
+      {
+        "id": "q20",
+        "model": "deepseek-flash",
+        "cited": [
+          1,
+          1
+        ],
+        "citation_valid": true,
+        "citation_grounded": true,
+        "gold_pages": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          14,
+          16,
+          17
+        ],
+        "cited_pages": [
+          6,
+          6
+        ],
+        "answer_chars": 253,
+        "verdicts": [
+          "weak",
+          "unverified"
+        ]
+      },
+      {
+        "id": "q21",
+        "model": "deepseek-flash",
+        "cited": [
+          1,
+          1
+        ],
+        "citation_valid": true,
+        "citation_grounded": true,
+        "gold_pages": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          10,
+          13,
+          14,
+          17,
+          18,
+          19
+        ],
+        "cited_pages": [
+          19,
+          19
+        ],
+        "answer_chars": 116,
+        "verdicts": [
+          "no_citation",
+          "no_citation"
+        ]
+      },
+      {
+        "id": "q22",
+        "model": "deepseek-flash",
+        "cited": [
+          1,
+          1,
+          1,
+          1
+        ],
+        "citation_valid": true,
+        "citation_grounded": true,
+        "gold_pages": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ],
+        "cited_pages": [
+          11,
+          11,
+          11,
+          11
+        ],
+        "answer_chars": 225,
+        "verdicts": [
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified"
+        ]
+      },
+      {
+        "id": "q23",
+        "model": "deepseek-flash",
+        "cited": [
+          1,
+          1
+        ],
+        "citation_valid": true,
+        "citation_grounded": true,
+        "gold_pages": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          8,
+          9
+        ],
+        "cited_pages": [
+          6,
+          6
+        ],
+        "answer_chars": 179,
+        "verdicts": [
+          "unverified",
+          "unverified"
+        ]
+      },
+      {
+        "id": "q24",
+        "model": "deepseek-flash",
+        "cited": [
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "citation_valid": true,
+        "citation_grounded": true,
+        "gold_pages": [
+          5,
+          6,
+          8,
+          9
+        ],
+        "cited_pages": [
+          6,
+          6,
+          6,
+          6,
+          6
+        ],
+        "answer_chars": 308,
+        "verdicts": [
+          "unverified",
+          "unverified",
+          "unverified",
+          "no_citation",
+          "unverified",
+          "unverified"
+        ]
+      },
+      {
+        "id": "q25",
+        "model": "deepseek-flash",
+        "cited": [
+          1,
+          1,
+          1
+        ],
+        "citation_valid": true,
+        "citation_grounded": true,
+        "gold_pages": [
+          1,
+          2,
+          3,
+          6,
+          7
+        ],
+        "cited_pages": [
+          2,
+          2,
+          2
+        ],
+        "answer_chars": 232,
+        "verdicts": [
+          "unverified",
+          "unverified",
+          "unverified"
+        ]
+      },
+      {
+        "id": "q26",
+        "model": "deepseek-flash",
+        "cited": [
+          1,
+          1,
+          1,
+          1
+        ],
+        "citation_valid": true,
+        "citation_grounded": true,
+        "gold_pages": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8
+        ],
+        "cited_pages": [
+          1,
+          1,
+          1,
+          1
+        ],
+        "answer_chars": 245,
+        "verdicts": [
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified"
+        ]
+      },
+      {
+        "id": "q27",
+        "model": "deepseek-flash",
+        "cited": [
+          1,
+          1
+        ],
+        "citation_valid": true,
+        "citation_grounded": false,
+        "gold_pages": [
+          2,
+          3
+        ],
+        "cited_pages": [
+          5,
+          5
+        ],
+        "answer_chars": 244,
+        "verdicts": [
+          "no_citation",
+          "no_citation",
+          "no_citation"
+        ]
+      },
+      {
+        "id": "q28",
+        "model": "deepseek-flash",
+        "cited": [
+          1,
+          1
+        ],
+        "citation_valid": true,
+        "citation_grounded": false,
+        "gold_pages": [
+          1,
+          2,
+          5,
+          6,
+          7
+        ],
+        "cited_pages": [
+          4,
+          4
+        ],
+        "answer_chars": 125,
+        "verdicts": [
+          "unverified",
+          "unverified"
+        ]
+      },
+      {
+        "id": "q29",
+        "model": "deepseek-flash",
+        "cited": [
+          1,
+          1,
+          1
+        ],
+        "citation_valid": true,
+        "citation_grounded": true,
+        "gold_pages": [
+          1,
+          2,
+          3,
+          4,
+          8,
+          9,
+          10,
+          19,
+          24,
+          34,
+          41,
+          42,
+          43
+        ],
+        "cited_pages": [
+          3,
+          3,
+          3
+        ],
+        "answer_chars": 279,
+        "verdicts": [
+          "unverified",
+          "no_citation",
+          "no_citation",
+          "unverified",
+          "unverified"
+        ]
+      },
+      {
+        "id": "q30",
+        "model": "deepseek-flash",
+        "cited": [
+          1,
+          1
+        ],
+        "citation_valid": true,
+        "citation_grounded": true,
+        "gold_pages": [
+          1,
+          2,
+          18,
+          19,
+          21,
+          22,
+          24,
+          25,
+          26,
+          28,
+          29,
+          30,
+          31,
+          32,
+          33,
+          34,
+          35,
+          41,
+          42
+        ],
+        "cited_pages": [
+          32,
+          32
+        ],
+        "answer_chars": 178,
+        "verdicts": [
+          "no_citation",
+          "no_citation",
+          "no_citation"
+        ]
+      },
+      {
+        "id": "q31",
+        "model": "deepseek-flash",
+        "cited": [
+          1,
+          1
+        ],
+        "citation_valid": true,
+        "citation_grounded": false,
+        "gold_pages": [
+          1,
+          2,
+          5,
+          6,
+          7,
+          8
+        ],
+        "cited_pages": [
+          10,
+          10
+        ],
+        "answer_chars": 209,
+        "verdicts": [
+          "unverified",
+          "no_citation",
+          "no_citation",
+          "no_citation",
+          "unverified"
+        ]
+      },
+      {
+        "id": "q32",
+        "model": "deepseek-flash",
+        "cited": [
+          1,
+          1
+        ],
+        "citation_valid": true,
+        "citation_grounded": false,
+        "gold_pages": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          7
+        ],
+        "cited_pages": [
+          6,
+          6
+        ],
+        "answer_chars": 178,
+        "verdicts": [
+          "unverified",
+          "no_citation",
+          "unverified"
+        ]
+      },
+      {
+        "id": "q33",
+        "model": "deepseek-flash",
+        "cited": [
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "citation_valid": true,
+        "citation_grounded": true,
+        "gold_pages": [
+          1,
+          2,
+          3,
+          6
+        ],
+        "cited_pages": [
+          2,
+          2,
+          2,
+          2,
+          2
+        ],
+        "answer_chars": 508,
+        "verdicts": [
+          "no_citation",
+          "no_citation",
+          "no_citation",
+          "no_citation",
+          "unverified",
+          "no_citation",
+          "weak",
+          "no_citation",
+          "weak",
+          "no_citation",
+          "no_citation"
+        ]
+      },
+      {
+        "id": "q34",
+        "model": "deepseek-flash",
+        "cited": [
+          1,
+          1,
+          1
+        ],
+        "citation_valid": true,
+        "citation_grounded": true,
+        "gold_pages": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          15
+        ],
+        "cited_pages": [
+          10,
+          10,
+          10
+        ],
+        "answer_chars": 260,
+        "verdicts": [
+          "unverified",
+          "unverified",
+          "no_citation",
+          "unverified"
+        ]
+      },
+      {
+        "id": "q35",
+        "model": "deepseek-flash",
+        "cited": [
+          1,
+          1,
+          1
+        ],
+        "citation_valid": true,
+        "citation_grounded": false,
+        "gold_pages": [
+          1,
+          2,
+          3,
+          11,
+          12
+        ],
+        "cited_pages": [
+          8,
+          8,
+          8
+        ],
+        "answer_chars": 135,
+        "verdicts": [
+          "no_citation",
+          "unverified",
+          "unverified",
+          "unverified"
+        ]
+      },
+      {
+        "id": "q36",
+        "model": "deepseek-flash",
+        "cited": [
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "citation_valid": true,
+        "citation_grounded": false,
+        "gold_pages": [
+          1,
+          2,
+          3,
+          4,
+          7,
+          8
+        ],
+        "cited_pages": [
+          5,
+          5,
+          5,
+          5,
+          5
+        ],
+        "answer_chars": 425,
+        "verdicts": [
+          "no_citation",
+          "unverified",
+          "unverified",
+          "unverified",
+          "unverified",
+          "no_citation",
+          "unverified"
+        ]
+      }
+    ]
+  }
+}

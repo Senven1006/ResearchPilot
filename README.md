@@ -26,6 +26,7 @@
 | 写作 Copilot | 由 idea 生成 Abstract / Introduction / Related Work 框架（参考文献仅取自库内真实论文）、生成 Mermaid / Graphviz / TikZ / Matplotlib 拓扑图脚本、中→英学术翻译 |
 | 数据可视化 | CSV 列画像、统计表、折线 / 柱状 / 三维透视雷达图（SVG）、由数据统计量确定性生成的学术图注 |
 | 引用图谱 | 用 arXiv 编号与参考文献条目建库内引用边（NetworkX），算 PageRank / 入度 / 共被引，输出「基石论文」与图谱驱动的综述骨架（基石文献 → 方法演化 → 库内引用关系 → 研究缺口），全部为确定性规则、可复核 |
+| 工具注册表与 Agent | 把检索、图谱查询、arXiv 元数据、断言核验封装成 6 个带 JSON Schema 的工具（`GET /tools`），模型可自选调用（`POST /agent/ask`，最多 6 步，返回每一步的工具、参数与观察） |
 
 ---
 
@@ -89,6 +90,7 @@ ResearchPilot/
 │   ├── writing.py           # 无幻觉框架、拓扑图脚本、学术翻译
 │   ├── dataviz.py           # CSV 画像、SVG 图表、学术图注
 │   ├── citation_graph.py    # 库内引用边、PageRank、共被引、基石论文与综述骨架
+│   ├── tools.py             # 6 个带 JSON Schema 的工具 + 模型自选调用的有界循环
 │   ├── fetch_arxiv_corpus.py # 下载并索引一批 arXiv 论文（建图/评测语料）
 │   ├── bench_long_document.py  # 长文档压测：切块 / 索引 / 分级加载 / 内存
 │   ├── tests/               # 离线接口用例（pytest）
@@ -103,8 +105,10 @@ ResearchPilot/
 │   ├── vite.config.js       # /api → 127.0.0.1:8000 代理
 │   └── package.json
 ├── samples/                 # 演示数据（training-log.csv 供可视化模块使用）
+├── eval/                    # gold set（36 题）与评测脚本（Recall@K / MRR / 引用准确率）
+├── tools/                   # package_submission.py：一条命令重打提交包
 ├── data/                    # 运行期生成（已 gitignore）
-├── docs/                    # 技术文档 + 作品介绍文档（Markdown 源 + 渲染/版式校验脚本 + PDF + 截图 + 长文档压测输出）
+├── docs/                    # 技术文档 + 作品介绍文档（Markdown 源 + 渲染/版式校验脚本 + PDF + 截图 + 长文档压测输出 + 评测报告）
 ├── .gitignore
 └── README.md
 ```
@@ -208,10 +212,28 @@ npm run dev                     # 默认 http://localhost:5173
 ```bash
 cd ResearchPilot/backend
 pip install -r requirements-dev.txt      # 含 pytest
-python -m pytest                         # 19 个用例，约 3 秒
+python -m pytest                         # 40 个用例，约 3.6 秒
 ```
 
-覆盖范围：健康检查与降级后端、结构化解析（标题树 / 参考文献切分）、入库与原件留档、内容级去重、问答证据与断言核验（含刻意答错数字被标出）、划词翻译与缓存、分章节翻译的缓存命中、CSV 图表生成、非 CSV 拒绝、库内文献回填、越界引用检测、鉴权开关（无 token / 错 token / header / `?token=` 四种情况）、`/api` 前缀改写、演示数据生成。
+覆盖范围：健康检查与降级后端、结构化解析（标题树 / 参考文献切分）、入库与原件留档、内容级去重、问答证据与断言核验（含刻意答错数字被标出）、划词翻译与缓存、分章节翻译的缓存命中、CSV 图表生成、非 CSV 拒绝、库内文献回填、越界引用检测、鉴权开关（无 token / 错 token / header / `?token=` 四种情况）、`/api` 前缀改写、演示数据生成、引用图谱（建边/PageRank/共被引/综述骨架）、工具注册表与 Agent 循环（含参数校验、arXiv 缓存、步数上限）。
+
+### 4.6 量化评测（gold set）
+
+单点演示数字容易被质疑"是不是挑的"，所以另有一份可复现评测：36 题 gold set + `eval/run_eval.py`，语料为 21 篇 arXiv 论文（4779 个检索单元）。
+
+| 指标 | 实测 |
+|---|---|
+| Recall@1 / @3 / @5 | 0.722 / 0.889 / 0.972 |
+| MRR | 0.822 |
+| 引用有效性（`[证据 N]` 是否越界） | 1.000（102 条引用全部合法） |
+| 引用落点准确率 / 精度 | 0.722（按题）/ 0.755（按引用） |
+
+```bash
+backend/.venv/Scripts/python.exe eval/run_eval.py                # 检索指标，离线几秒
+backend/.venv/Scripts/python.exe eval/run_eval.py --with-model   # 另跑模型生成与引用指标
+```
+
+完整方法、失败分析与口径说明见 [`docs/eval-report.md`](docs/eval-report.md)。
 
 前端检查：
 
@@ -224,7 +246,7 @@ npm run build
 
 推送或提 PR 时 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) 会自动跑后端 pytest + 前端 lint / 查重回归 / build 三段流水线。
 
-### 4.6 在线演示（公网部署）
+### 4.7 在线演示（公网部署）
 
 赛事要求提供可公网访问的地址，仓库已带单容器部署方案：`Dockerfile`（Node 构建前端 → Python 装后端 → 一个进程同时提供 API 与页面）+ `render.yaml`（Render 免费层 Blueprint）。分步指南与免费层限制见 [`docs/deploy-render.md`](docs/deploy-render.md)。
 
@@ -306,6 +328,7 @@ ALLOW_ORIGINS=http://127.0.0.1:5173
 | 写作 | `POST /writing/outline`、`POST /writing/diagrams`、`POST /writing/translate` | 论文框架、拓扑图脚本、学术英文 |
 | 可视化 | `POST /dataviz/report`、`GET /dataviz/charts/{stem}/{name}` | CSV → 画像 / 表格 / SVG 图表 / 图注 |
 | 引用图谱 | `GET /graph/summary`、`POST /graph/review` | 库内引用图谱（PageRank / 入度 / 共被引）、基石论文、图谱驱动综述骨架 |
+| 工具与 Agent | `GET /tools`、`POST /tools/{name}`、`POST /agent/ask` | 工具 JSON Schema、单工具调用、模型自选工具的有界循环（含每步观察） |
 
 ---
 
@@ -326,6 +349,7 @@ ALLOW_ORIGINS=http://127.0.0.1:5173
 13. **在线演示实例的内存受限**：Render 免费层 512 MB，`MAX_PAGES=80`；页面在休眠后首访需 30–60 秒冷启动，容器磁盘为临时存储（重启后索引清空，示例论文会自动重灌）。
 14. **引用图谱的质量取决于参考文献切分**：双栏论文的参考文献有时会并成一大块（实测 20 篇语料里 23 条引用来自这种合并块），这类条目只用于连边、不生成单条文献节点；抽不到 arXiv 编号的条目按标题建外部节点，只参与共被引统计。
 15. **基石论文依赖库内规模**：图谱只在"已入库论文"之间建边，库越小结论越不稳；当前 20 篇语料里 Bahdanau（2014）被 4 篇引用、LayerNorm 被 2 篇引用，共被引强对只有 1 组。
+16. **评测范围有限**：gold set 36 题、单领域（21 篇 NLP/注意力论文）、单篇内提问，跨学科与跨论文问题未覆盖；哈希嵌入下 `verify_claims` 走 `numeric_only`，`supported_rate` 不适用；关键词定页会在关键词高频出现时放宽召回，因此 Recall 是偏乐观的上界。
 
 ---
 
